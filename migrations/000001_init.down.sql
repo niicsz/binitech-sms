@@ -1,0 +1,18 @@
+DROP TABLE IF EXISTS processed_ops;
+DROP TABLE IF EXISTS outbox;
+DROP TABLE IF EXISTS idempotency_requests;
+DROP TABLE IF EXISTS webhooks;
+DROP TABLE IF EXISTS dlr_events;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS campaigns;
+DROP TRIGGER IF EXISTS routes_changed ON routes;
+DROP FUNCTION IF EXISTS notify_routes_changed();
+DROP TABLE IF EXISTS routes;
+DROP TABLE IF EXISTS alphanames;
+DROP TABLE IF EXISTS tariffs;
+DROP TRIGGER IF EXISTS ledger_no_update ON ledger_entries;
+DROP TABLE IF EXISTS ledger_entries;
+DROP FUNCTION IF EXISTS ledger_immutable();
+DROP TABLE IF EXISTS balances;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS accounts;

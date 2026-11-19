@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build e testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go build ./...
+      - run: go test -race -count=1 ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.15.0
+
+  migrations:
+    name: Migrações no Postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: binitech_sms
+          POSTGRES_USER: sms
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sms -d binitech_sms"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Sobe, desce e sobe de novo
+        run: |
+          url="postgres://sms:ci@localhost:5432/binitech_sms?sslmode=disable"
+          docker run --rm --network host -v "$PWD/migrations:/migrations:ro" migrate/migrate:v4.19.0 -path=/migrations -database="$url" up
+          docker run --rm --network host -v "$PWD/migrations:/migrations:ro" migrate/migrate:v4.19.0 -path=/migrations -database="$url" down -all
+          docker run --rm --network host -v "$PWD/migrations:/migrations:ro" migrate/migrate:v4.19.0 -path=/migrations -database="$url" up
+
+  topics:
+    name: Script de tópicos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: bash -n deploy/local/kafka/create-topics.sh
+      - name: Sobe o Kafka do Compose e cria os tópicos
+        run: |
+          cat > .env <<'EOF'
+          POSTGRES_PASSWORD=ci
+          GRAFANA_PASSWORD=ci
+          EOF
+          docker compose -f deploy/local/docker-compose.yml --env-file .env up -d kafka
+          docker compose -f deploy/local/docker-compose.yml --env-file .env run --rm kafka-topics
+          docker compose -f deploy/local/docker-compose.yml --env-file .env down -v

@@ -1,0 +1,54 @@
+version: "2"
+
+linters:
+  enable:
+    - depguard
+    - errorlint
+    - gosec
+    - bodyclose
+    - noctx
+  settings:
+    depguard:
+      rules:
+        domain:
+          files:
+            - "**/internal/domain/**"
+          deny:
+            - pkg: github.com/niicsz/binitech-sms/internal/application
+              desc: o domínio não conhece casos de uso
+            - pkg: github.com/niicsz/binitech-sms/internal/adapter
+              desc: o domínio não conhece adapters
+            - pkg: github.com/niicsz/binitech-sms/internal/platform
+              desc: o domínio não conhece infraestrutura
+            - pkg: github.com/jackc
+              desc: o domínio não conhece o banco
+            - pkg: github.com/twmb
+              desc: o domínio não conhece o Kafka
+        application:
+          files:
+            - "**/internal/application/**"
+          deny:
+            - pkg: github.com/niicsz/binitech-sms/internal/adapter
+              desc: casos de uso falam com portas, não com adapters
+            - pkg: github.com/niicsz/binitech-sms/internal/platform
+              desc: casos de uso não conhecem infraestrutura
+            - pkg: github.com/jackc
+              desc: use uma porta de saída
+            - pkg: github.com/twmb
+              desc: use uma porta de saída
+            - pkg: net/http
+              desc: HTTP é um adapter de entrada
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/niicsz/binitech-sms
