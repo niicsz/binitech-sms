@@ -10,8 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/twmb/franz-go/pkg/kgo"
 
+	"github.com/niicsz/binitech-sms/internal/adapter/out/carrier/gsm"
 	"github.com/niicsz/binitech-sms/internal/adapter/out/carrier/httproute"
 	"github.com/niicsz/binitech-sms/internal/adapter/out/carrier/sandbox"
+	"github.com/niicsz/binitech-sms/internal/adapter/out/carrier/smpp"
 	kafkaadapter "github.com/niicsz/binitech-sms/internal/adapter/out/kafka"
 	"github.com/niicsz/binitech-sms/internal/adapter/out/postgres"
 	"github.com/niicsz/binitech-sms/internal/adapter/out/system"
@@ -95,6 +97,19 @@ func BuildCarrier(id string, settings RouteSettings, env func(string) string, sa
 			return built, err
 		}
 		built.Carrier, built.Callback = c, c
+	case "smpp":
+		c, err := smpp.New(id, settings.Config, env)
+		if err != nil {
+			return built, err
+		}
+		c.Start()
+		built.Carrier = c
+	case "gsm":
+		c, err := gsm.New(id, settings.Config, env)
+		if err != nil {
+			return built, err
+		}
+		built.Carrier = c
 	default:
 		return built, fmt.Errorf("rota %s: tipo %q ainda não suportado", id, settings.Kind)
 	}
