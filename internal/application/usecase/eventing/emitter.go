@@ -68,3 +68,18 @@ func (e *Emitter) Flush(ctx context.Context, staged *Staged) {
 	}
 	_ = e.outbox.MarkPublished(ctx, staged.ids, e.clock.Now())
 }
+
+func (e *Emitter) Publish(ctx context.Context, envelopes ...events.Envelope) error {
+	if err := e.publisher.Publish(ctx, envelopes...); err != nil {
+		return fmt.Errorf("eventing: publicar: %w", err)
+	}
+	return nil
+}
+
+func (e *Emitter) Now() time.Time {
+	return e.clock.Now()
+}
+
+func (e *Emitter) OpID() string {
+	return e.ids.OpID()
+}

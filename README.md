@@ -76,6 +76,11 @@ make run-relay              # outbox-relay, métricas em :9101
   - chave `sk_test_` não cobra e marca o evento como teste.
 - `outbox-relay`: lê o outbox com `FOR UPDATE SKIP LOCKED`, publica com `acks=all` e só marca depois da confirmação do broker.
 - `smsctl`: cria conta, emite e revoga chave, credita saldo, cadastra tarifa e aprova remetente.
+- `router-worker`: consome `sms.submit`, escolhe a rota (LCR por prioridade, custo e peso, só rotas saudáveis, recarga por `LISTEN routes_changed`) e publica em `sms.dispatch.<rota>`. Chave de teste vai sempre para a rota `sandbox`.
+- `route-adapter` (`ROUTE_ID=...`): envia pela rota com limite de vazão (`tps`), publica o resultado e os DLRs em `sms.status.dlr` e grava a saúde da rota. Rotas disponíveis:
+  - `sandbox`: simula entrega; destino terminado em `0000` falha e em `9999` é recusado;
+  - `http`: atacadista genérico configurado no JSON da rota (URL, header de autenticação lido de variável de ambiente, corpo com `{{to}}`, `{{to_digits}}`, `{{from}}`, `{{text}}`, `{{message_id}}`, campo do id na resposta e callback de DLR em `CALLBACK_ADDR` com `X-Callback-Token`).
+- `status-engine`: aplica aceite e recusa da operadora, DLR por parte (multipart) e expiração; publica `webhook.outbound` e `ledger.events` (débito no aceite, liberação na recusa ou expiração).
 
 ### Primeiro envio local
 
@@ -98,8 +103,9 @@ Por enquanto só celulares brasileiros (MCC 724). A operadora (MNC) fica vazia a
 
 ## Próximos passos
 
-1. Runner de consumidor Kafka com commit manual, retry topics e DLQ.
-2. `router-worker`, `route-adapter`, `status-engine`, `webhook-dispatcher` e `ledger-consumer`, um binário por vez em `cmd/`.
+1. `ledger-consumer` e `webhook-dispatcher`.
+2. Adapter SMPP e modem GSM.
+3. Envio em lote, campanhas, OTP, links curtos e consultas restantes.
 
 ## Testes
 

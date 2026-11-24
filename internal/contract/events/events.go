@@ -24,6 +24,10 @@ const (
 	OpWebhookDeliver  = "webhook.deliver"
 	OpLedgerDebit     = "ledger.debit"
 	OpLedgerRelease   = "ledger.release"
+	OpMessageStatus   = "message.status"
+	OpCarrierAccepted = "message.carrier_accepted"
+	OpCarrierRejected = "message.carrier_rejected"
+	OpStatusChanged   = "message.status_changed"
 )
 
 type Envelope struct {
@@ -55,12 +59,66 @@ type MessageDispatched struct {
 	AccountID    string    `json:"account_id"`
 	RouteID      string    `json:"route_id"`
 	RouteReason  string    `json:"route_reason"`
+	To           string    `json:"to"`
+	From         string    `json:"from"`
+	Text         string    `json:"text"`
+	Encoding     string    `json:"encoding"`
+	Segments     int       `json:"segments"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	Test         bool      `json:"test,omitempty"`
 	Attempt      int       `json:"attempt"`
 	DispatchedAt time.Time `json:"dispatched_at"`
 }
 
-type DlrReceived struct {
+type MessageStatus struct {
+	MessageID string    `json:"message_id"`
+	AccountID string    `json:"account_id"`
+	Status    string    `json:"status"`
+	ErrorCode string    `json:"error_code,omitempty"`
+	At        time.Time `json:"at"`
+}
+
+type CarrierAccepted struct {
 	MessageID      string    `json:"message_id"`
+	AccountID      string    `json:"account_id"`
+	RouteID        string    `json:"route_id"`
+	ProviderMsgIDs []string  `json:"provider_msg_ids"`
+	AcceptedAt     time.Time `json:"accepted_at"`
+}
+
+type CarrierRejected struct {
+	MessageID  string    `json:"message_id"`
+	AccountID  string    `json:"account_id"`
+	RouteID    string    `json:"route_id"`
+	ErrorCode  string    `json:"error_code"`
+	RejectedAt time.Time `json:"rejected_at"`
+}
+
+type MessageStatusChanged struct {
+	MessageID  string    `json:"message_id"`
+	AccountID  string    `json:"account_id"`
+	Status     string    `json:"status"`
+	ErrorCode  string    `json:"error_code,omitempty"`
+	WebhookRef string    `json:"webhook_ref,omitempty"`
+	To         string    `json:"to"`
+	Segments   int       `json:"segments"`
+	Cost       string    `json:"cost"`
+	Test       bool      `json:"test,omitempty"`
+	ChangedAt  time.Time `json:"changed_at"`
+}
+
+type LedgerRequest struct {
+	OpID      string       `json:"op_id"`
+	AccountID string       `json:"account_id"`
+	MessageID string       `json:"message_id"`
+	Kind      string       `json:"kind"`
+	Amount    money.Amount `json:"amount"`
+	Reason    string       `json:"reason"`
+	At        time.Time    `json:"at"`
+}
+
+type DlrReceived struct {
+	MessageID      string    `json:"message_id,omitempty"`
 	RouteID        string    `json:"route_id"`
 	ProviderMsgID  string    `json:"provider_msg_id"`
 	ProviderStatus string    `json:"provider_status"`
