@@ -67,6 +67,7 @@ type LedgerEntry struct {
 
 type LedgerRepository interface {
 	Append(ctx context.Context, entry LedgerEntry) error
+	AppendMany(ctx context.Context, entries []LedgerEntry) error
 }
 
 type Destination struct {
@@ -89,16 +90,18 @@ type SenderRepository interface {
 
 type StoredMessage struct {
 	message.Message
-	MCC       string
-	MNC       string
-	Test      bool
-	ErrorCode string
-	UpdatedAt time.Time
-	IdemKey   string
+	MCC        string
+	MNC        string
+	Test       bool
+	ErrorCode  string
+	UpdatedAt  time.Time
+	IdemKey    string
+	CampaignID string
 }
 
 type MessageRepository interface {
 	Insert(ctx context.Context, msg StoredMessage) error
+	InsertMany(ctx context.Context, msgs []StoredMessage) error
 	FindByID(ctx context.Context, accountID, id string) (StoredMessage, error)
 }
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
@@ -55,4 +56,23 @@ func mainErr(service string, run func(ctx context.Context, p Process) error) err
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	return run(ctx, Process{Config: cfg, Log: log, Pool: pool, Producer: producer, Registry: registry})
+}
+
+func Loop(ctx context.Context, log *slog.Logger, name string, every time.Duration, tick func(context.Context) (bool, error)) {
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		busy, err := tick(ctx)
+		if err != nil && ctx.Err() == nil {
+			log.Warn(name+": rodada falhou", "error", err)
+		}
+		if busy && err == nil {
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }

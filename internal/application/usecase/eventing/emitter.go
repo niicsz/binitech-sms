@@ -57,6 +57,19 @@ func (e *Emitter) Stage(ctx context.Context, staged *Staged, envelopes ...events
 	return nil
 }
 
+func (e *Emitter) StageMany(ctx context.Context, staged *Staged, envelopes []events.Envelope) error {
+	if len(envelopes) == 0 {
+		return nil
+	}
+	ids, err := e.outbox.EnqueueMany(ctx, envelopes)
+	if err != nil {
+		return fmt.Errorf("eventing: outbox: %w", err)
+	}
+	staged.ids = append(staged.ids, ids...)
+	staged.envelopes = append(staged.envelopes, envelopes...)
+	return nil
+}
+
 func (e *Emitter) Flush(ctx context.Context, staged *Staged) {
 	if staged == nil || len(staged.envelopes) == 0 {
 		return

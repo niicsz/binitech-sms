@@ -73,53 +73,13 @@ func (s *Service) Send(ctx context.Context, cmd in.SendCommand) (in.SendResult, 
 	if err != nil {
 		return in.SendResult{}, fmt.Errorf("conta: %w", err)
 	}
-	dest, err := s.d.Destinations.Resolve(ctx, p.to)
-	if errors.Is(err, out.ErrNotFound) {
-		return in.SendResult{}, apperr.New(apperr.Forbidden, "Destino não atendido pela plataforma.")
-	}
-	if err != nil {
-		return in.SendResult{}, fmt.Errorf("destino: %w", err)
-	}
-	approved, err := s.d.Senders.IsApproved(ctx, account.ID, p.sender, dest.Country)
-	if err != nil {
-		return in.SendResult{}, fmt.Errorf("remetente: %w", err)
-	}
-	if !approved {
-		return in.SendResult{}, apperr.New(apperr.Forbidden, "Remetente "+p.sender+" não está aprovado para este destino.")
-	}
 	now := s.d.Clock.Now()
 	test := cmd.Principal.Env == apikey.Test
-	var unit money.Amount
-	if !test {
-		unit, err = s.d.Tariffs.UnitPrice(ctx, account.Plan, dest.MCC, dest.MNC, now)
-		if errors.Is(err, out.ErrNotFound) {
-			return in.SendResult{}, apperr.New(apperr.Forbidden, "Não há tarifa para este destino no seu plano.")
-		}
-		if err != nil {
-			return in.SendResult{}, fmt.Errorf("tarifa: %w", err)
-		}
+	msg, err := s.build(ctx, newLookups(), account, p, cmd.WebhookRef, test, now)
+	if err != nil {
+		return in.SendResult{}, err
 	}
-
-	msg := out.StoredMessage{
-		Message: message.Message{
-			ID:         s.d.IDs.MessageID(),
-			AccountID:  account.ID,
-			To:         p.to,
-			Sender:     p.sender,
-			Body:       p.text,
-			Encoding:   p.analysis.Encoding,
-			Segments:   p.analysis.Segments,
-			Status:     message.Accepted,
-			WebhookRef: cmd.WebhookRef,
-			ExpiresAt:  now.Add(p.validity),
-			CreatedAt:  now,
-		},
-		MCC:     dest.MCC,
-		MNC:     dest.MNC,
-		Test:    test,
-		IdemKey: cmd.IdempotencyKey,
-	}
-	msg.Price(unit)
+	msg.IdemKey = cmd.IdempotencyKey
 	result := in.SendResult{
 		MessageID: msg.ID,
 		Status:    string(message.Accepted),
@@ -186,6 +146,72 @@ func (s *Service) Send(ctx context.Context, cmd in.SendCommand) (in.SendResult, 
 	return result, nil
 }
 
+type lookups struct {
+	senders map[string]bool
+	tariffs map[string]money.Amount
+}
+
+func newLookups() *lookups {
+	return &lookups{senders: map[string]bool{}, tariffs: map[string]money.Amount{}}
+}
+
+func (s *Service) build(ctx context.Context, cache *lookups, account out.Account, p prepared, webhookRef string, test bool, now time.Time) (out.StoredMessage, error) {
+	dest, err := s.d.Destinations.Resolve(ctx, p.to)
+	if errors.Is(err, out.ErrNotFound) {
+		return out.StoredMessage{}, apperr.New(apperr.Forbidden, "Destino não atendido pela plataforma.")
+	}
+	if err != nil {
+		return out.StoredMessage{}, fmt.Errorf("destino: %w", err)
+	}
+	senderKey := p.sender + "|" + dest.Country
+	approved, ok := cache.senders[senderKey]
+	if !ok {
+		if approved, err = s.d.Senders.IsApproved(ctx, account.ID, p.sender, dest.Country); err != nil {
+			return out.StoredMessage{}, fmt.Errorf("remetente: %w", err)
+		}
+		cache.senders[senderKey] = approved
+	}
+	if !approved {
+		return out.StoredMessage{}, apperr.New(apperr.Forbidden, "Remetente "+p.sender+" não está aprovado para este destino.")
+	}
+	var unit money.Amount
+	if !test {
+		tariffKey := dest.MCC + dest.MNC
+		cached, ok := cache.tariffs[tariffKey]
+		if !ok {
+			cached, err = s.d.Tariffs.UnitPrice(ctx, account.Plan, dest.MCC, dest.MNC, now)
+			if errors.Is(err, out.ErrNotFound) {
+				return out.StoredMessage{}, apperr.New(apperr.Forbidden, "Não há tarifa para este destino no seu plano.")
+			}
+			if err != nil {
+				return out.StoredMessage{}, fmt.Errorf("tarifa: %w", err)
+			}
+			cache.tariffs[tariffKey] = cached
+		}
+		unit = cached
+	}
+	msg := out.StoredMessage{
+		Message: message.Message{
+			ID:         s.d.IDs.MessageID(),
+			AccountID:  account.ID,
+			To:         p.to,
+			Sender:     p.sender,
+			Body:       p.text,
+			Encoding:   p.analysis.Encoding,
+			Segments:   p.analysis.Segments,
+			Status:     message.Accepted,
+			WebhookRef: webhookRef,
+			ExpiresAt:  now.Add(p.validity),
+			CreatedAt:  now,
+		},
+		MCC:  dest.MCC,
+		MNC:  dest.MNC,
+		Test: test,
+	}
+	msg.Price(unit)
+	return msg, nil
+}
+
 func (s *Service) claimIdempotency(ctx context.Context, cmd in.SendCommand, accountID string) (*in.SendResult, error) {
 	hash := requestHash(cmd)
 	existing, err := s.d.Idempotency.Begin(ctx, accountID, cmd.IdempotencyKey, hash)
@@ -222,6 +248,7 @@ func (s *Service) submittedEvent(msg out.StoredMessage, now time.Time) (events.E
 		UnitPrice:   msg.UnitPrice,
 		ExpiresAt:   msg.ExpiresAt,
 		Test:        msg.Test,
+		CampaignID:  campaign(msg.CampaignID),
 		SubmittedAt: now,
 	})
 }
@@ -278,4 +305,11 @@ func requestHash(cmd in.SendCommand) []byte {
 	}{cmd.To, cmd.From, cmd.Text, cmd.WebhookRef, cmd.Normalize, cmd.ValidityMinutes})
 	sum := sha256.Sum256(canonical)
 	return sum[:]
+}
+
+func campaign(id string) *string {
+	if id == "" {
+		return nil
+	}
+	return &id
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/niicsz/binitech-sms/internal/application/port/in"
 	"github.com/niicsz/binitech-sms/internal/application/port/out"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/auth"
+	"github.com/niicsz/binitech-sms/internal/application/usecase/campaign"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/eventing"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/query"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/readiness"
@@ -65,21 +66,7 @@ func (c CoreAPI) Handler() http.Handler {
 	if c.Redis != nil {
 		limiter = auth.NewRateLimiter(ratelimit.NewGCRA(c.Redis, c.RatePerSec, c.RateBurst))
 	}
-	sender := send.New(send.Deps{
-		Tx:           postgres.NewTxManager(c.Pool),
-		Accounts:     accounts,
-		Balances:     balances,
-		Ledger:       balances,
-		Destinations: destination.Brazil{},
-		Tariffs:      catalog,
-		Senders:      catalog,
-		Messages:     messages,
-		Idempotency:  postgres.NewIdempotency(c.Pool),
-		Events:       eventing.NewEmitter(postgres.NewOutboxRepository(c.Pool), kafkaadapter.NewPublisher(c.Kafka), clock, system.NewIDs(clock)),
-		Clock:        clock,
-		IDs:          system.NewIDs(clock),
-		Env:          c.Env,
-	})
+	sender := SendService(c.Pool, c.Kafka, c.Env, clock)
 	return httpadapter.NewRouter(httpadapter.Deps{
 		Log:           c.Log,
 		Readiness:     readiness.New(2*time.Second, checkers...),
@@ -87,7 +74,30 @@ func (c CoreAPI) Handler() http.Handler {
 		Authenticator: auth.NewAuthenticator(accounts, hasher, clock, c.KeyCache),
 		RateLimiter:   limiter,
 		Sender:        sender,
+		Bulk:          sender,
+		Listings:      query.NewListings(accounts, messages, catalog),
+		Campaigns:     campaign.New(postgres.NewCampaigns(c.Pool), accounts, sender, system.NewIDs(clock), clock),
 		Queries:       query.New(accounts, balances, messages),
 		Webhooks:      webhook.NewManager(postgres.NewWebhooks(c.Pool), c.SecretBox, system.NewIDs(clock), clock, rand.Reader),
+	})
+}
+
+func SendService(pool *pgxpool.Pool, client *kgo.Client, env string, clock out.Clock) *send.Service {
+	balances := postgres.NewBalances(pool)
+	catalog := postgres.NewCatalog(pool)
+	return send.New(send.Deps{
+		Tx:           postgres.NewTxManager(pool),
+		Accounts:     postgres.NewAccounts(pool),
+		Balances:     balances,
+		Ledger:       balances,
+		Destinations: destination.Brazil{},
+		Tariffs:      catalog,
+		Senders:      catalog,
+		Messages:     postgres.NewMessages(pool),
+		Idempotency:  postgres.NewIdempotency(pool),
+		Events:       eventing.NewEmitter(postgres.NewOutboxRepository(pool), kafkaadapter.NewPublisher(client), clock, system.NewIDs(clock)),
+		Clock:        clock,
+		IDs:          system.NewIDs(clock),
+		Env:          env,
 	})
 }

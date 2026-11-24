@@ -12,6 +12,8 @@ tags:
   - name: Account
   - name: Messages
   - name: Webhooks
+  - name: Campaigns
+  - name: Senders
 
 paths:
   /v1/account/balance:
@@ -71,6 +73,106 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/message/sendBulk:
+    post:
+      tags: [Messages]
+      operationId: sendBulk
+      summary: Envia até 10.000 SMS num lote; destinos inválidos são listados sem barrar o resto
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendBulkRequest'
+      responses:
+        '202':
+          description: Lote aceito
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/message/list:
+    get:
+      tags: [Messages]
+      operationId: listMessages
+      summary: Lista mensagens da conta, das mais novas para as mais antigas, com paginação por cursor
+      parameters:
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/MessageStatus'}}
+        - {name: campaign_id, in: query, schema: {type: string, maxLength: 40}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: cursor, in: query, schema: {type: string, maxLength: 200}}
+      responses:
+        '200':
+          description: Página de mensagens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagePageEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/campaign/create:
+    post:
+      tags: [Campaigns]
+      operationId: createCampaign
+      summary: Agenda uma campanha; o texto aceita variáveis por destinatário no formato chave entre chaves duplas
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampaignRequest'
+      responses:
+        '201':
+          description: Campanha agendada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/campaign/{id}/summary:
+    get:
+      tags: [Campaigns]
+      operationId: campaignSummary
+      summary: Andamento e resultado da campanha
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, maxLength: 40}}
+      responses:
+        '200':
+          description: Resumo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/alphaname/list:
+    get:
+      tags: [Senders]
+      operationId: listAlphanames
+      summary: Remetentes da conta e situação da aprovação
+      responses:
+        '200':
+          description: Remetentes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlphanameListEnvelope'
         default:
           $ref: '#/components/responses/Error'
 
@@ -453,3 +555,149 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Webhook'
+
+    BulkItem:
+      type: object
+      required: [to]
+      properties:
+        to: {type: string}
+        text: {type: string, maxLength: 1600, description: Texto próprio deste destino; sem ele vale o texto do lote}
+        webhook_ref: {type: string, maxLength: 64}
+
+    SendBulkRequest:
+      type: object
+      required: [from, messages]
+      properties:
+        from: {type: string, maxLength: 11}
+        text: {type: string, maxLength: 1600}
+        normalize: {type: boolean}
+        validity_minutes: {type: integer, minimum: 1, maximum: 4320}
+        messages:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items: {$ref: '#/components/schemas/BulkItem'}
+
+    BulkAccepted:
+      type: object
+      required: [index, message_id, segments, cost]
+      properties:
+        index: {type: integer}
+        message_id: {type: string}
+        segments: {type: integer}
+        cost: {type: string}
+
+    BulkRejected:
+      type: object
+      required: [index, message]
+      properties:
+        index: {type: integer}
+        field: {type: string}
+        message: {type: string}
+
+    BulkResult:
+      type: object
+      required: [accepted, rejected, total_cost, currency, test]
+      properties:
+        accepted: {type: array, items: {$ref: '#/components/schemas/BulkAccepted'}}
+        rejected: {type: array, items: {$ref: '#/components/schemas/BulkRejected'}}
+        total_cost: {type: string}
+        currency: {type: string}
+        test: {type: boolean}
+
+    BulkEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: {type: integer}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/BulkResult'}
+
+    MessagePage:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Message'}}
+        next_cursor: {type: string}
+
+    MessagePageEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: {type: integer}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/MessagePage'}
+
+    CampaignRecipient:
+      type: object
+      required: [to]
+      properties:
+        to: {type: string}
+        vars:
+          type: object
+          additionalProperties: {type: string}
+
+    CampaignRequest:
+      type: object
+      required: [name, from, text, scheduled_at, recipients]
+      properties:
+        name: {type: string, maxLength: 120}
+        from: {type: string, maxLength: 11}
+        text: {type: string, maxLength: 1600}
+        normalize: {type: boolean}
+        validity_minutes: {type: integer, minimum: 1, maximum: 4320}
+        scheduled_at: {type: string, format: date-time}
+        window_start: {type: string, description: Início do horário permitido em HH:MM no fuso time_zone}
+        window_end: {type: string, description: Fim do horário permitido em HH:MM}
+        time_zone: {type: string, description: Fuso IANA; padrão America/Sao_Paulo}
+        recipients:
+          type: array
+          minItems: 1
+          maxItems: 100000
+          items: {$ref: '#/components/schemas/CampaignRecipient'}
+
+    CampaignSummary:
+      type: object
+      required: [campaign_id, name, status, scheduled_at, total, pending, submitted, rejected, delivered, failed, in_flight, cost, currency, test]
+      properties:
+        campaign_id: {type: string}
+        name: {type: string}
+        status: {type: string, enum: [scheduled, running, paused, done, cancelled]}
+        scheduled_at: {type: string, format: date-time}
+        started_at: {type: string, format: date-time}
+        finished_at: {type: string, format: date-time}
+        total: {type: integer}
+        pending: {type: integer}
+        submitted: {type: integer}
+        rejected: {type: integer}
+        delivered: {type: integer}
+        failed: {type: integer}
+        in_flight: {type: integer}
+        cost: {type: string}
+        currency: {type: string}
+        test: {type: boolean}
+
+    CampaignEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: {type: integer}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/CampaignSummary'}
+
+    Alphaname:
+      type: object
+      required: [sender, kind, countries, status]
+      properties:
+        sender: {type: string}
+        kind: {type: string, enum: [alphanumeric, shortcode, longcode]}
+        countries: {type: array, items: {type: string}}
+        status: {type: string, enum: [pending, approved, rejected]}
+
+    AlphanameListEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: {type: integer}
+        message: {type: string}
+        data: {type: array, items: {$ref: '#/components/schemas/Alphaname'}}

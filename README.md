@@ -86,6 +86,10 @@ make run-relay              # outbox-relay, métricas em :9101
 - `ledger-consumer`: efetiva `debit` (sai do disponível e da reserva) e `release` (volta só a reserva) com `op_id` único no ledger; reserva menor que o lançamento vai para a DLQ.
 - `webhook-dispatcher`: transforma cada mudança de status em uma entrega por webhook inscrito (`message.submitted`, `message.delivered`, `message.failed`), assina com `X-BiniTech-Signature: t=<unix>,v1=<HMAC-SHA256 de "t.corpo">`, não segue redirecionamento, recusa endereços internos (SSRF) e desativa o webhook depois de 50 falhas seguidas.
 - `GET/POST /v1/webhook` e `GET/PUT/DELETE /v1/webhook/{id}`: o segredo `whsec_...` aparece só na criação e fica cifrado (AES-GCM com `WEBHOOK_SECRET_KEY`) no banco.
+- `POST /v1/message/sendBulk`: até 10.000 destinos por lote, com texto do lote ou de cada item; destinos inválidos voltam em `rejected` com o índice e não barram o resto; uma reserva para o total e uma transação para tudo.
+- `GET /v1/message/list`: mais novas primeiro, filtros de período, status e campanha, cursor estável (`created_at`, `id`).
+- `POST /v1/campaign/create` e `GET /v1/campaign/{id}/summary`: até 100.000 destinatários, variáveis `{{chave}}` por destinatário, janela de horário com fuso; o `campaign-scheduler` envia em blocos de 1.000 com idempotência por bloco, pausa a campanha quando falta saldo e só um scheduler trabalha por vez (advisory lock).
+- `GET /v1/alphaname/list`: remetentes da conta e situação.
 
 ### Primeiro envio local
 
@@ -108,7 +112,7 @@ Por enquanto só celulares brasileiros (MCC 724). A operadora (MNC) fica vazia a
 
 ## Próximos passos
 
-1. Envio em lote, campanhas, OTP, links curtos e consultas restantes.
+1. OTP, links curtos com rastreamento e opt-out.
 
 ## Testes
 
