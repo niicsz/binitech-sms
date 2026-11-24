@@ -5,7 +5,6 @@ go 1.26.0
 require (
 	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/fergusstrange/embedded-postgres v1.34.0
-	github.com/getkin/kin-openapi v0.153.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/oapi-codegen/runtime v1.9.1
@@ -20,6 +19,7 @@ require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/getkin/kin-openapi v0.153.0 // indirect
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
