@@ -14,6 +14,7 @@ require (
 	github.com/twmb/franz-go/pkg/kfake v0.0.0-20261124064352-f8ed4fc8185e
 	golang.org/x/crypto v0.51.0
 	golang.org/x/sync v0.25.0
+	golang.org/x/time v0.16.0
 )
 
 require (

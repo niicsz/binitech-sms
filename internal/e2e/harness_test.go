@@ -31,6 +31,15 @@ import (
 
 const submitTopic = "sms.submit.e2e"
 
+func allTopics() []string {
+	base := []string{submitTopic, "sms.dispatch.sandbox", "sms.dispatch.http-1", "sms.status.dlr", "webhook.outbound", "ledger.events"}
+	topics := []string{"dlq.global", "campaign.progress", "link.clicks"}
+	for _, t := range base {
+		topics = append(topics, t, t+".retry.5m", t+".retry.1h")
+	}
+	return topics
+}
+
 var fastHasher = secret.Scrypt{N: 16, R: 1, P: 1}
 
 type env struct {
@@ -54,7 +63,7 @@ func newEnv(t *testing.T, opts options) *env {
 		opts.burst = 1000
 	}
 	pool := pgtest.New(t)
-	cluster := kafkatest.New(t, submitTopic)
+	cluster := kafkatest.New(t, allTopics()...)
 	client := cluster.Client(t, kafkax.ProducerOptions(cluster.Brokers(), "e2e")...)
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})

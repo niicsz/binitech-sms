@@ -5,7 +5,7 @@ BOOTSTRAP="${BOOTSTRAP:-kafka:9092}"
 APP_ENV="${APP_ENV:-local}"
 REPLICATION="${REPLICATION:-3}"
 MIN_ISR="${MIN_ISR:-2}"
-ROUTES="${ROUTES:-http-wholesale-1}"
+ROUTES="${ROUTES:-sandbox,http-wholesale-1}"
 TOPICS_BIN="${TOPICS_BIN:-/opt/kafka/bin/kafka-topics.sh}"
 
 DAY=86400000

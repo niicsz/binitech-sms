@@ -58,24 +58,28 @@ func (r *Messages) Insert(ctx context.Context, m out.StoredMessage) error {
 	return nil
 }
 
+const messageColumns = `id, account_id, to_msisdn, sender, body, encoding, segments, mcc, mnc,
+	unit_price::text, cost::text, status, webhook_ref, error_code, test, expires_at, created_at, updated_at`
+
 func (r *Messages) FindByID(ctx context.Context, accountID, id string) (out.StoredMessage, error) {
+	return scanMessage(conn(ctx, r.pool).QueryRow(ctx,
+		`SELECT `+messageColumns+` FROM messages WHERE id = $1 AND account_id = $2`, id, accountID))
+}
+
+func scanMessage(row pgx.Row) (out.StoredMessage, error) {
 	var (
 		m                          out.StoredMessage
 		to, encoding, status       string
 		unit, cost                 string
 		mcc, mnc, webhook, errCode *string
 	)
-	err := conn(ctx, r.pool).QueryRow(ctx,
-		`SELECT id, account_id, to_msisdn, sender, body, encoding, segments, mcc, mnc,
-		        unit_price::text, cost::text, status, webhook_ref, error_code, test, expires_at, created_at, updated_at
-		   FROM messages WHERE id = $1 AND account_id = $2`, id, accountID,
-	).Scan(&m.ID, &m.AccountID, &to, &m.Sender, &m.Body, &encoding, &m.Segments, &mcc, &mnc,
+	err := row.Scan(&m.ID, &m.AccountID, &to, &m.Sender, &m.Body, &encoding, &m.Segments, &mcc, &mnc,
 		&unit, &cost, &status, &webhook, &errCode, &m.Test, &m.ExpiresAt, &m.CreatedAt, &m.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out.StoredMessage{}, out.ErrNotFound
 	}
 	if err != nil {
-		return out.StoredMessage{}, fmt.Errorf("messages: find: %w", err)
+		return out.StoredMessage{}, fmt.Errorf("messages: scan: %w", err)
 	}
 	m.To = phone.Number(to)
 	m.Encoding = segment.Encoding(encoding)
