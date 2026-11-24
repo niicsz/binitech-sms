@@ -80,6 +80,8 @@ make run-relay              # outbox-relay, métricas em :9101
 - `route-adapter` (`ROUTE_ID=...`): envia pela rota com limite de vazão (`tps`), publica o resultado e os DLRs em `sms.status.dlr` e grava a saúde da rota. Rotas disponíveis:
   - `sandbox`: simula entrega; destino terminado em `0000` falha e em `9999` é recusado;
   - `http`: atacadista genérico configurado no JSON da rota (URL, header de autenticação lido de variável de ambiente, corpo com `{{to}}`, `{{to_digits}}`, `{{from}}`, `{{text}}`, `{{message_id}}`, campo do id na resposta e callback de DLR em `CALLBACK_ADDR` com `X-Callback-Token`).
+  - `smpp`: SMPP 3.4 por transceiver (`addr`, `system_id`, senha em `password_env`, TLS opcional, TON/NPI por tipo de remetente, `dlr_id_format` para operadoras que mandam o id do recibo em outra base). Mensagem longa vai com UDH; throttling (0x58), fila cheia e erro de sistema voltam pelo retry, os demais status viram recusa `smpp_0xNN`.
+  - `gsm`: modem por comandos AT em modo texto (`device`, `baud`, `pin_env`), só uma parte por mensagem, com relatório de entrega por `+CDS`. Use apenas com linha corporativa autorizada para esse tráfego.
 - `status-engine`: aplica aceite e recusa da operadora, DLR por parte (multipart) e expiração; publica `webhook.outbound` e `ledger.events` (débito no aceite, liberação na recusa ou expiração).
 - `ledger-consumer`: efetiva `debit` (sai do disponível e da reserva) e `release` (volta só a reserva) com `op_id` único no ledger; reserva menor que o lançamento vai para a DLQ.
 - `webhook-dispatcher`: transforma cada mudança de status em uma entrega por webhook inscrito (`message.submitted`, `message.delivered`, `message.failed`), assina com `X-BiniTech-Signature: t=<unix>,v1=<HMAC-SHA256 de "t.corpo">`, não segue redirecionamento, recusa endereços internos (SSRF) e desativa o webhook depois de 50 falhas seguidas.
@@ -106,8 +108,7 @@ Por enquanto só celulares brasileiros (MCC 724). A operadora (MNC) fica vazia a
 
 ## Próximos passos
 
-1. Adapter SMPP e modem GSM.
-2. Envio em lote, campanhas, OTP, links curtos e consultas restantes.
+1. Envio em lote, campanhas, OTP, links curtos e consultas restantes.
 
 ## Testes
 

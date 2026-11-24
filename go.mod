@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/fergusstrange/embedded-postgres v1.34.0
+	github.com/fiorix/go-smpp v0.0.0-20210403173735-2894b96e70ba
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/oapi-codegen/runtime v1.9.1
@@ -12,6 +13,7 @@ require (
 	github.com/redis/go-redis/v9 v9.24.0
 	github.com/twmb/franz-go v1.22.3
 	github.com/twmb/franz-go/pkg/kfake v0.0.0-20261124064352-f8ed4fc8185e
+	go.bug.st/serial v1.8.0
 	golang.org/x/crypto v0.51.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/time v0.16.0
