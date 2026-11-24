@@ -66,16 +66,40 @@ make run-relay              # outbox-relay, métricas em :9101
 
 ## O que já existe
 
-- Domínio com testes: segmentação GSM-7/UCS-2 (153/67 por parte, sem partir extensão nem emoji), dinheiro em 4 casas, telefone E.164 e a máquina de estados da mensagem.
-- `core-api`: `/healthz`, `/readyz` (Postgres e Kafka), `/metrics` e envelope `{code, message, data}` nas respostas de `/v1`.
-- `outbox-relay`: lê o outbox com `FOR UPDATE SKIP LOCKED`, publica no Kafka com `acks=all` e produtor idempotente, e só marca como publicado depois da confirmação do broker.
-- Migração inicial com todas as tabelas do planejamento.
+- Domínio com testes: segmentação GSM-7/UCS-2 (153/67 por parte, sem partir extensão nem emoji), dinheiro em 4 casas, telefone E.164, chave de API e a máquina de estados da mensagem.
+- `core-api`:
+  - `POST /v1/message/send`, `GET /v1/message/{id}` e `GET /v1/account/balance`, gerados do `api/openapi.yaml` (oapi-codegen, modo strict);
+  - chave em `X-Api-Key` ou `Authorization: Bearer`, hash scrypt e cache de 5 minutos; chave na URL é recusada;
+  - limite por conta com GCRA no Redis, cabeçalhos `RateLimit-*` e `Retry-After`;
+  - `Idempotency-Key` gravada na mesma transação da mensagem, antes do Kafka;
+  - reserva de saldo, lançamento `reserve` no ledger, mensagem e outbox numa transação, e publicação imediata com o relay como garantia;
+  - chave `sk_test_` não cobra e marca o evento como teste.
+- `outbox-relay`: lê o outbox com `FOR UPDATE SKIP LOCKED`, publica com `acks=all` e só marca depois da confirmação do broker.
+- `smsctl`: cria conta, emite e revoga chave, credita saldo, cadastra tarifa e aprova remetente.
+
+### Primeiro envio local
+
+```sh
+export DATABASE_URL=...            # o mesmo do .env
+go run ./cmd/smsctl account create -name "Minha loja"
+go run ./cmd/smsctl key issue -account acc_... -env test
+go run ./cmd/smsctl tariff set -plan default -mcc 724 -price 0.0800
+go run ./cmd/smsctl sender approve -account acc_... -sender BINITECH -kind shortcode -countries BR
+go run ./cmd/smsctl balance credit -account acc_... -amount 10
+
+curl -s localhost:8080/v1/message/send -H "X-Api-Key: sk_test_..." -H "Idempotency-Key: teste-1" -H "Content-Type: application/json" -d '{"to":"+5511987654321","from":"BINITECH","text":"Seu codigo e 482913"}'
+```
+
+O contrato fica em `api/openapi.yaml`. Depois de alterá-lo, rode `make generate`; o CI falha se o código gerado estiver desatualizado.
+
+## Destinos atendidos
+
+Por enquanto só celulares brasileiros (MCC 724). A operadora (MNC) fica vazia até existir a consulta à base de portabilidade, e a tarifa usa o preço do país.
 
 ## Próximos passos
 
-1. `POST /v1/message/send`: autenticação, idempotência, reserva de saldo, outbox e publicação.
-2. Runner de consumidor Kafka com commit manual, retry topics e DLQ.
-3. `router-worker`, `route-adapter`, `status-engine`, `webhook-dispatcher` e `ledger-consumer`, um binário por vez em `cmd/`.
+1. Runner de consumidor Kafka com commit manual, retry topics e DLQ.
+2. `router-worker`, `route-adapter`, `status-engine`, `webhook-dispatcher` e `ledger-consumer`, um binário por vez em `cmd/`.
 
 ## Testes
 
@@ -83,3 +107,5 @@ make run-relay              # outbox-relay, métricas em :9101
 make test     # go test -race ./...
 make lint     # go vet + golangci-lint
 ```
+
+Os testes de integração sobem um PostgreSQL 17 embutido (baixado na primeira execução) e um Kafka falso do franz-go, então rodam sem Docker. Com `TEST_DATABASE_URL` definida, usam esse banco no lugar do embutido.

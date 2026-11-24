@@ -1,0 +1,270 @@
+openapi: 3.0.3
+info:
+  title: BiniTech SMS API
+  version: 1.0.0
+  description: API pública de envio de SMS da BiniTech. Toda resposta usa o envelope code, message e data.
+servers:
+  - url: https://api.sms.binitechpdv.com.br
+security:
+  - ApiKeyHeader: []
+  - BearerKey: []
+tags:
+  - name: Account
+  - name: Messages
+
+paths:
+  /v1/account/balance:
+    get:
+      tags: [Account]
+      operationId: getBalance
+      summary: Saldo disponível e reservado da conta
+      responses:
+        '200':
+          description: Saldo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/message/send:
+    post:
+      tags: [Messages]
+      operationId: sendMessage
+      summary: Envia um SMS
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '202':
+          description: Mensagem aceita, tarifada e publicada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendMessageEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/message/{id}:
+    get:
+      tags: [Messages]
+      operationId: getMessage
+      summary: Status, segmentos e custo de uma mensagem
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 40
+      responses:
+        '200':
+          description: Mensagem
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+    BearerKey:
+      type: http
+      scheme: bearer
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+
+  responses:
+    Error:
+      description: Erro no envelope padrão
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          description: 4000 inválido, 4010 chave, 4020 saldo, 4030 proibido, 4040 não encontrado, 4090 conflito, 4290 limite, 5000 interno
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ErrorData'
+
+    ErrorData:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+
+    Encoding:
+      type: string
+      enum: [GSM7, UCS2]
+
+    MessageStatus:
+      type: string
+      enum: [accepted, routed, submitted, delivered, undelivered, expired, rejected, failed]
+
+    SendMessageRequest:
+      type: object
+      required: [to, from, text]
+      properties:
+        to:
+          type: string
+          description: Destino em E.164
+          example: '+5511987654321'
+        from:
+          type: string
+          maxLength: 11
+          description: Remetente aprovado na conta
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1600
+        normalize:
+          type: boolean
+          description: Troca aspas e travessões tipográficos por equivalentes GSM antes de segmentar
+        validity_minutes:
+          type: integer
+          minimum: 1
+          maximum: 4320
+        webhook_ref:
+          type: string
+          maxLength: 64
+
+    SendResult:
+      type: object
+      required: [message_id, status, segments, encoding, cost, currency]
+      properties:
+        message_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/MessageStatus'
+        segments:
+          type: integer
+        encoding:
+          $ref: '#/components/schemas/Encoding'
+        cost:
+          type: string
+          example: '0.0800'
+        currency:
+          type: string
+          example: BRL
+        test:
+          type: boolean
+
+    SendMessageEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/SendResult'
+
+    Message:
+      type: object
+      required: [message_id, to, from, status, segments, encoding, cost, currency, created_at, expires_at]
+      properties:
+        message_id:
+          type: string
+        to:
+          type: string
+        from:
+          type: string
+        status:
+          $ref: '#/components/schemas/MessageStatus'
+        segments:
+          type: integer
+        encoding:
+          $ref: '#/components/schemas/Encoding'
+        cost:
+          type: string
+        currency:
+          type: string
+        error_code:
+          type: string
+        webhook_ref:
+          type: string
+        test:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    MessageEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Message'
+
+    Balance:
+      type: object
+      required: [available, reserved, spendable, currency]
+      properties:
+        available:
+          type: string
+        reserved:
+          type: string
+        spendable:
+          type: string
+        currency:
+          type: string
+
+    BalanceEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Balance'

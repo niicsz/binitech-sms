@@ -46,6 +46,7 @@ type MessageSubmitted struct {
 	UnitPrice   money.Amount `json:"unit_price"`
 	ExpiresAt   time.Time    `json:"expires_at"`
 	CampaignID  *string      `json:"campaign_id"`
+	Test        bool         `json:"test,omitempty"`
 	SubmittedAt time.Time    `json:"submitted_at"`
 }
 

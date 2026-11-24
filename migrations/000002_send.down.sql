@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS alphanames_approved;
+ALTER TABLE messages DROP COLUMN IF EXISTS test;
+ALTER TABLE accounts DROP COLUMN IF EXISTS plan;
