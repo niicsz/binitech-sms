@@ -17,6 +17,10 @@ type Config struct {
 	DatabaseURL     string
 	KafkaBrokers    []string
 	KafkaClientID   string
+	RedisAddr       string
+	RedisPassword   string
+	RatePerSecond   int
+	RateBurst       int
 	OutboxBatch     int
 	OutboxInterval  time.Duration
 	OutboxGrace     time.Duration
@@ -33,9 +37,17 @@ func Load(service string) (Config, error) {
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
 		KafkaBrokers:    split(get("KAFKA_BROKERS", "127.0.0.1:29092")),
 		KafkaClientID:   get("KAFKA_CLIENT_ID", service),
+		RedisAddr:       get("REDIS_ADDR", "127.0.0.1:6380"),
+		RedisPassword:   os.Getenv("REDIS_PASSWORD"),
 		ShutdownTimeout: 15 * time.Second,
 	}
 	var err error
+	if cfg.RatePerSecond, err = intValue("RATE_LIMIT_PER_SECOND", 50); err != nil {
+		return cfg, err
+	}
+	if cfg.RateBurst, err = intValue("RATE_LIMIT_BURST", 200); err != nil {
+		return cfg, err
+	}
 	if cfg.OutboxBatch, err = intValue("OUTBOX_BATCH", 500); err != nil {
 		return cfg, err
 	}

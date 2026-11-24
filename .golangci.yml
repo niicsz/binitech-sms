@@ -43,6 +43,12 @@ linters:
       - path: _test\.go
         linters:
           - gosec
+          - errcheck
+      - path: internal/testsupport/
+        linters:
+          - gosec
+          - errcheck
+          - noctx
 
 formatters:
   enable:

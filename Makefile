@@ -1,7 +1,7 @@
 COMPOSE := docker compose -f deploy/local/docker-compose.yml --env-file .env
-SERVICES := core-api outbox-relay
+SERVICES := core-api outbox-relay smsctl
 
-.PHONY: up down reset topics migrate test lint build run-api run-relay images
+.PHONY: up down reset topics migrate generate test lint build run-api run-relay images
 
 up:
 	$(COMPOSE) up -d
@@ -17,6 +17,9 @@ topics:
 
 migrate:
 	$(COMPOSE) run --rm migrate
+
+generate:
+	go tool oapi-codegen -config api/oapi-codegen.yaml api/openapi.yaml
 
 test:
 	go test -race ./...

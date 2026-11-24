@@ -19,6 +19,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Código gerado do OpenAPI atualizado
+        run: |
+          go tool oapi-codegen -config api/oapi-codegen.yaml api/openapi.yaml
+          git diff --exit-code -- internal/adapter/in/http/api
       - run: go vet ./...
       - run: go build ./...
       - run: go test -race -count=1 ./...

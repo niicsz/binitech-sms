@@ -7,15 +7,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/redis/go-redis/v9"
 
-	httpadapter "github.com/niicsz/binitech-sms/internal/adapter/in/http"
-	kafkaadapter "github.com/niicsz/binitech-sms/internal/adapter/out/kafka"
-	"github.com/niicsz/binitech-sms/internal/adapter/out/postgres"
-	"github.com/niicsz/binitech-sms/internal/application/usecase/readiness"
+	"github.com/niicsz/binitech-sms/internal/bootstrap"
 	"github.com/niicsz/binitech-sms/internal/platform/config"
 	"github.com/niicsz/binitech-sms/internal/platform/httpserver"
 	"github.com/niicsz/binitech-sms/internal/platform/kafkax"
@@ -51,13 +48,21 @@ func run() error {
 	}
 	defer kafka.Close()
 
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr, Password: cfg.RedisPassword})
+	defer func() { _ = rdb.Close() }()
+
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
-	ready := readiness.New(2*time.Second,
-		postgres.NewHealthChecker(pool),
-		kafkaadapter.NewHealthChecker(kafka),
-	)
-	router := httpadapter.NewRouter(httpadapter.Deps{Log: log, Readiness: ready, Registry: registry})
-	return httpserver.Run(ctx, log, cfg.HTTPAddr, router, cfg.ShutdownTimeout)
+	handler := bootstrap.CoreAPI{
+		Log:        log,
+		Env:        cfg.Env,
+		Pool:       pool,
+		Kafka:      kafka,
+		Redis:      rdb,
+		Registry:   registry,
+		RatePerSec: cfg.RatePerSecond,
+		RateBurst:  cfg.RateBurst,
+	}.Handler()
+	return httpserver.Run(ctx, log, cfg.HTTPAddr, handler, cfg.ShutdownTimeout)
 }

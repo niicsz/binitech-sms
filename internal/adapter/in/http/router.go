@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/niicsz/binitech-sms/internal/adapter/in/http/api"
 	"github.com/niicsz/binitech-sms/internal/application/port/in"
 )
 
@@ -23,9 +24,13 @@ type Envelope struct {
 }
 
 type Deps struct {
-	Log       *slog.Logger
-	Readiness in.Readiness
-	Registry  *prometheus.Registry
+	Log           *slog.Logger
+	Readiness     in.Readiness
+	Registry      *prometheus.Registry
+	Authenticator in.Authenticator
+	RateLimiter   in.RateLimiter
+	Sender        in.MessageSender
+	Queries       in.AccountQueries
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -44,11 +49,32 @@ func NewRouter(deps Deps) http.Handler {
 	r.Get("/readyz", readyHandler(deps.Readiness))
 	r.Handle("/metrics", promhttp.HandlerFor(deps.Registry, promhttp.HandlerOpts{Registry: deps.Registry}))
 
-	r.Route("/v1", func(v1 chi.Router) {
-		v1.NotFound(func(w http.ResponseWriter, _ *http.Request) {
-			writeJSON(w, http.StatusNotFound, Envelope{Code: 4040, Message: "Rota não encontrada."})
-		})
+	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusNotFound, Envelope{Code: 4040, Message: "Rota não encontrada."})
 	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusMethodNotAllowed, Envelope{Code: 4050, Message: "Método não permitido nesta rota."})
+	})
+
+	if deps.Authenticator != nil {
+		strict := api.NewStrictHandlerWithOptions(&handlers{sender: deps.Sender, queries: deps.Queries}, nil, api.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
+				badRequest(w, "Corpo da requisição não é um JSON válido para esta rota.")
+			},
+			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				writeError(deps.Log, w, r, err)
+			},
+		})
+		r.Group(func(v1 chi.Router) {
+			v1.Use(authenticate(deps.Log, deps.Authenticator, deps.RateLimiter))
+			api.HandlerWithOptions(strict, api.ChiServerOptions{
+				BaseRouter: v1,
+				ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+					badRequest(w, "Parâmetro inválido: "+err.Error())
+				},
+			})
+		})
+	}
 	return r
 }
 
