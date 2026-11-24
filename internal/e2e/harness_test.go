@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/niicsz/binitech-sms/internal/adapter/out/postgres"
 	"github.com/niicsz/binitech-sms/internal/adapter/out/secret"
+	"github.com/niicsz/binitech-sms/internal/adapter/out/secretbox"
 	"github.com/niicsz/binitech-sms/internal/adapter/out/system"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/admin"
 	"github.com/niicsz/binitech-sms/internal/bootstrap"
@@ -51,6 +53,8 @@ type env struct {
 	account string
 	liveKey string
 	testKey string
+
+	webhookCAs *x509.CertPool
 }
 
 type options struct {
@@ -79,6 +83,7 @@ func newEnv(t *testing.T, opts options) *env {
 		Hasher:     fastHasher,
 		RatePerSec: 1,
 		RateBurst:  opts.burst,
+		SecretBox:  testBox(t),
 	}.Handler()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
@@ -168,4 +173,13 @@ func (e *env) scalar(sql string, args ...any) string {
 		e.t.Fatalf("%s: %v", sql, err)
 	}
 	return v
+}
+
+func testBox(t *testing.T) *secretbox.AESGCM {
+	t.Helper()
+	box, err := secretbox.FromBase64("MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return box
 }

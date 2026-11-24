@@ -11,8 +11,9 @@ import (
 var errNoPrincipal = errors.New("http: requisição sem principal autenticado")
 
 type handlers struct {
-	sender  in.MessageSender
-	queries in.AccountQueries
+	sender   in.MessageSender
+	queries  in.AccountQueries
+	webhooks in.WebhookManager
 }
 
 var _ api.StrictServerInterface = (*handlers)(nil)

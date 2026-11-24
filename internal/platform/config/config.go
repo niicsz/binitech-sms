@@ -20,6 +20,7 @@ type Config struct {
 	RedisAddr       string
 	RedisPassword   string
 	RatePerSecond   int
+	WebhookKey      string
 	RateBurst       int
 	OutboxBatch     int
 	OutboxInterval  time.Duration
@@ -39,6 +40,7 @@ func Load(service string) (Config, error) {
 		KafkaClientID:   get("KAFKA_CLIENT_ID", service),
 		RedisAddr:       get("REDIS_ADDR", "127.0.0.1:6380"),
 		RedisPassword:   os.Getenv("REDIS_PASSWORD"),
+		WebhookKey:      os.Getenv("WEBHOOK_SECRET_KEY"),
 		ShutdownTimeout: 15 * time.Second,
 	}
 	var err error

@@ -81,6 +81,9 @@ make run-relay              # outbox-relay, métricas em :9101
   - `sandbox`: simula entrega; destino terminado em `0000` falha e em `9999` é recusado;
   - `http`: atacadista genérico configurado no JSON da rota (URL, header de autenticação lido de variável de ambiente, corpo com `{{to}}`, `{{to_digits}}`, `{{from}}`, `{{text}}`, `{{message_id}}`, campo do id na resposta e callback de DLR em `CALLBACK_ADDR` com `X-Callback-Token`).
 - `status-engine`: aplica aceite e recusa da operadora, DLR por parte (multipart) e expiração; publica `webhook.outbound` e `ledger.events` (débito no aceite, liberação na recusa ou expiração).
+- `ledger-consumer`: efetiva `debit` (sai do disponível e da reserva) e `release` (volta só a reserva) com `op_id` único no ledger; reserva menor que o lançamento vai para a DLQ.
+- `webhook-dispatcher`: transforma cada mudança de status em uma entrega por webhook inscrito (`message.submitted`, `message.delivered`, `message.failed`), assina com `X-BiniTech-Signature: t=<unix>,v1=<HMAC-SHA256 de "t.corpo">`, não segue redirecionamento, recusa endereços internos (SSRF) e desativa o webhook depois de 50 falhas seguidas.
+- `GET/POST /v1/webhook` e `GET/PUT/DELETE /v1/webhook/{id}`: o segredo `whsec_...` aparece só na criação e fica cifrado (AES-GCM com `WEBHOOK_SECRET_KEY`) no banco.
 
 ### Primeiro envio local
 
@@ -103,9 +106,8 @@ Por enquanto só celulares brasileiros (MCC 724). A operadora (MNC) fica vazia a
 
 ## Próximos passos
 
-1. `ledger-consumer` e `webhook-dispatcher`.
-2. Adapter SMPP e modem GSM.
-3. Envio em lote, campanhas, OTP, links curtos e consultas restantes.
+1. Adapter SMPP e modem GSM.
+2. Envio em lote, campanhas, OTP, links curtos e consultas restantes.
 
 ## Testes
 
