@@ -41,6 +41,7 @@ type Deps struct {
 	Messages     out.MessageRepository
 	Idempotency  out.IdempotencyStore
 	Events       *eventing.Emitter
+	OptOuts      out.OptOutStore
 	Clock        out.Clock
 	IDs          out.IDGenerator
 	Env          string
@@ -162,6 +163,15 @@ func (s *Service) build(ctx context.Context, cache *lookups, account out.Account
 	}
 	if err != nil {
 		return out.StoredMessage{}, fmt.Errorf("destino: %w", err)
+	}
+	if s.d.OptOuts != nil {
+		opted, err := s.d.OptOuts.IsOptedOut(ctx, account.ID, p.to.String())
+		if err != nil {
+			return out.StoredMessage{}, fmt.Errorf("opt-out: %w", err)
+		}
+		if opted {
+			return out.StoredMessage{}, apperr.New(apperr.Forbidden, "O destino pediu para não receber mensagens desta conta.")
+		}
 	}
 	senderKey := p.sender + "|" + dest.Country
 	approved, ok := cache.senders[senderKey]

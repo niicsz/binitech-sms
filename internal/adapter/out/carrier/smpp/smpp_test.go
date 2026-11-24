@@ -166,3 +166,24 @@ func TestParseReceipt(t *testing.T) {
 		t.Fatalf("got %+v", r)
 	}
 }
+
+func TestMobileOriginatedMessage(t *testing.T) {
+	c, err := smpp.New("op-a", []byte(`{"addr":"127.0.0.1:1","system_id":"x"}`), func(string) string { return "" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	mo := pdu.NewDeliverSM()
+	_ = mo.Fields().Set(pdufield.ESMClass, uint8(0))
+	_ = mo.Fields().Set(pdufield.SourceAddr, "5511987654321")
+	_ = mo.Fields().Set(pdufield.DestinationAddr, "29292")
+	_ = mo.Fields().Set(pdufield.ShortMessage, "SAIR")
+	go c.Handle(mo)
+	select {
+	case report := <-c.Reports():
+		if report.Status != out.StatusMO || report.Raw["from"] != "5511987654321" || report.Raw["to"] != "29292" || report.Raw["text"] != "SAIR" {
+			t.Fatalf("MO: %+v", report)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("MO não chegou")
+	}
+}

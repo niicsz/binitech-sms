@@ -21,6 +21,8 @@ type Config struct {
 	RedisPassword   string
 	RatePerSecond   int
 	WebhookKey      string
+	OTPKey          string
+	LinkBase        string
 	RateBurst       int
 	OutboxBatch     int
 	OutboxInterval  time.Duration
@@ -41,6 +43,8 @@ func Load(service string) (Config, error) {
 		RedisAddr:       get("REDIS_ADDR", "127.0.0.1:6380"),
 		RedisPassword:   os.Getenv("REDIS_PASSWORD"),
 		WebhookKey:      os.Getenv("WEBHOOK_SECRET_KEY"),
+		OTPKey:          os.Getenv("OTP_HMAC_KEY"),
+		LinkBase:        get("LINK_BASE_URL", "http://localhost:8090"),
 		ShutdownTimeout: 15 * time.Second,
 	}
 	var err error

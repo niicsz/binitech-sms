@@ -23,6 +23,8 @@ import (
 	"github.com/niicsz/binitech-sms/internal/application/usecase/auth"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/campaign"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/eventing"
+	"github.com/niicsz/binitech-sms/internal/application/usecase/links"
+	"github.com/niicsz/binitech-sms/internal/application/usecase/otp"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/query"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/readiness"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/send"
@@ -42,6 +44,8 @@ type CoreAPI struct {
 	RateBurst  int
 	KeyCache   time.Duration
 	SecretBox  out.SecretBox
+	OTPKey     []byte
+	LinkBase   string
 }
 
 func (c CoreAPI) Handler() http.Handler {
@@ -77,6 +81,8 @@ func (c CoreAPI) Handler() http.Handler {
 		Bulk:          sender,
 		Listings:      query.NewListings(accounts, messages, catalog),
 		Campaigns:     campaign.New(postgres.NewCampaigns(c.Pool), accounts, sender, system.NewIDs(clock), clock),
+		OTP:           otp.New(postgres.NewTxManager(c.Pool), postgres.NewEngagement(c.Pool), sender, system.NewIDs(clock), clock, rand.Reader, c.OTPKey),
+		Links:         links.New(postgres.NewEngagement(c.Pool), postgres.NewCampaigns(c.Pool), system.NewIDs(clock), clock, rand.Reader, c.LinkBase),
 		Queries:       query.New(accounts, balances, messages),
 		Webhooks:      webhook.NewManager(postgres.NewWebhooks(c.Pool), c.SecretBox, system.NewIDs(clock), clock, rand.Reader),
 	})
@@ -96,6 +102,7 @@ func SendService(pool *pgxpool.Pool, client *kgo.Client, env string, clock out.C
 		Messages:     postgres.NewMessages(pool),
 		Idempotency:  postgres.NewIdempotency(pool),
 		Events:       eventing.NewEmitter(postgres.NewOutboxRepository(pool), kafkaadapter.NewPublisher(client), clock, system.NewIDs(clock)),
+		OptOuts:      postgres.NewEngagement(pool),
 		Clock:        clock,
 		IDs:          system.NewIDs(clock),
 		Env:          env,

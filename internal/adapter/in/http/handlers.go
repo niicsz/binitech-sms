@@ -17,6 +17,8 @@ type handlers struct {
 	bulk      in.BulkSender
 	listings  in.Listings
 	campaigns in.CampaignManager
+	otp       in.OTPService
+	links     in.LinkShortener
 }
 
 var _ api.StrictServerInterface = (*handlers)(nil)

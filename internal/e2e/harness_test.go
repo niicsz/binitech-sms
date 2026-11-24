@@ -85,6 +85,8 @@ func newEnv(t *testing.T, opts options) *env {
 		RatePerSec: 1,
 		RateBurst:  opts.burst,
 		SecretBox:  testBox(t),
+		OTPKey:     []byte("chave-de-teste-do-otp-com-32-bytes!!"),
+		LinkBase:   "https://bnt.li",
 	}.Handler()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)

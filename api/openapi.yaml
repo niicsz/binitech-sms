@@ -14,6 +14,8 @@ tags:
   - name: Webhooks
   - name: Campaigns
   - name: Senders
+  - name: OTP
+  - name: Links
 
 paths:
   /v1/account/balance:
@@ -173,6 +175,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AlphanameListEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/otp/send:
+    post:
+      tags: [OTP]
+      operationId: sendOtp
+      summary: Gera um código, guarda só o HMAC e envia por SMS
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpSendRequest'
+      responses:
+        '202':
+          description: Código enviado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSentEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/otp/verify:
+    post:
+      tags: [OTP]
+      operationId: verifyOtp
+      summary: Confere o código; status verified, invalid, expired, blocked ou used
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: Resultado da conferência
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpVerifyEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/link/shorten:
+    post:
+      tags: [Links]
+      operationId: shortenLink
+      summary: Cria um link curto com contagem de cliques
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShortenRequest'
+      responses:
+        '201':
+          description: Link criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortLinkEnvelope'
         default:
           $ref: '#/components/responses/Error'
 
@@ -701,3 +768,78 @@ components:
         code: {type: integer}
         message: {type: string}
         data: {type: array, items: {$ref: '#/components/schemas/Alphaname'}}
+
+    OtpSendRequest:
+      type: object
+      required: [to, from]
+      properties:
+        to: {type: string}
+        from: {type: string, maxLength: 11}
+        template: {type: string, maxLength: 300, description: Texto com o marcador de código; padrão em português}
+        length: {type: integer, minimum: 4, maximum: 8}
+        ttl_seconds: {type: integer, minimum: 60, maximum: 1800}
+        max_attempts: {type: integer, minimum: 1, maximum: 10}
+
+    OtpSent:
+      type: object
+      required: [otp_id, message_id, expires_at]
+      properties:
+        otp_id: {type: string}
+        message_id: {type: string}
+        expires_at: {type: string, format: date-time}
+        test_code: {type: string, description: Só aparece com chave sk_test_}
+
+    OtpSentEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: {type: integer}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/OtpSent'}
+
+    OtpVerifyRequest:
+      type: object
+      required: [otp_id, code]
+      properties:
+        otp_id: {type: string, maxLength: 40}
+        code: {type: string, maxLength: 12}
+
+    OtpVerification:
+      type: object
+      required: [status, attempts_left]
+      properties:
+        status: {type: string, enum: [verified, invalid, expired, blocked, used]}
+        attempts_left: {type: integer}
+
+    OtpVerifyEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: {type: integer}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/OtpVerification'}
+
+    ShortenRequest:
+      type: object
+      required: [url]
+      properties:
+        url: {type: string, maxLength: 2048}
+        campaign_id: {type: string, maxLength: 40}
+        message_id: {type: string, maxLength: 40}
+
+    ShortLink:
+      type: object
+      required: [link_id, code, short_url, url]
+      properties:
+        link_id: {type: string}
+        code: {type: string}
+        short_url: {type: string}
+        url: {type: string}
+
+    ShortLinkEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: {type: integer}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/ShortLink'}

@@ -35,6 +35,8 @@ type Deps struct {
 	Bulk          in.BulkSender
 	Listings      in.Listings
 	Campaigns     in.CampaignManager
+	OTP           in.OTPService
+	Links         in.LinkShortener
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -61,7 +63,7 @@ func NewRouter(deps Deps) http.Handler {
 	})
 
 	if deps.Authenticator != nil {
-		strict := api.NewStrictHandlerWithOptions(&handlers{sender: deps.Sender, queries: deps.Queries, webhooks: deps.Webhooks, bulk: deps.Bulk, listings: deps.Listings, campaigns: deps.Campaigns}, nil, api.StrictHTTPServerOptions{
+		strict := api.NewStrictHandlerWithOptions(&handlers{sender: deps.Sender, queries: deps.Queries, webhooks: deps.Webhooks, bulk: deps.Bulk, listings: deps.Listings, campaigns: deps.Campaigns, otp: deps.OTP, links: deps.Links}, nil, api.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
 				badRequest(w, "Corpo da requisição não é um JSON válido para esta rota.")
 			},

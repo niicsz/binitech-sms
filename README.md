@@ -90,6 +90,9 @@ make run-relay              # outbox-relay, métricas em :9101
 - `GET /v1/message/list`: mais novas primeiro, filtros de período, status e campanha, cursor estável (`created_at`, `id`).
 - `POST /v1/campaign/create` e `GET /v1/campaign/{id}/summary`: até 100.000 destinatários, variáveis `{{chave}}` por destinatário, janela de horário com fuso; o `campaign-scheduler` envia em blocos de 1.000 com idempotência por bloco, pausa a campanha quando falta saldo e só um scheduler trabalha por vez (advisory lock).
 - `GET /v1/alphaname/list`: remetentes da conta e situação.
+- `POST /v1/otp/send` e `POST /v1/otp/verify`: código de 4 a 8 dígitos guardado só como HMAC (`OTP_HMAC_KEY`), validade de 1 a 30 minutos, até 10 tentativas, no máximo 5 códigos por hora e 30 s entre reenvios para o mesmo destino; a conferência devolve `verified`, `invalid`, `expired`, `blocked` ou `used`. Com chave `sk_test_` a resposta traz `test_code`.
+- `POST /v1/link/shorten` e `link-redirector`: código de 7 caracteres em `LINK_BASE_URL`, só http/https, redirecionamento 302 sem cache e contagem de cliques (IP guardado só como hash).
+- Opt-out: resposta `SAIR`, `PARAR`, `STOP`, `CANCELAR`, `DESCADASTRAR` ou `REMOVER` recebida por SMPP bloqueia o número para as contas que usam aquele remetente; o envio para ele passa a ser recusado com 403.
 
 ### Primeiro envio local
 
@@ -112,7 +115,7 @@ Por enquanto só celulares brasileiros (MCC 724). A operadora (MNC) fica vazia a
 
 ## Próximos passos
 
-1. OTP, links curtos com rastreamento e opt-out.
+1. SDK oficial em Java (`com.binitech:sms-java`).
 
 ## Testes
 

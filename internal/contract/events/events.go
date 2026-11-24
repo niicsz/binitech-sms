@@ -29,6 +29,7 @@ const (
 	OpCarrierAccepted = "message.carrier_accepted"
 	OpCarrierRejected = "message.carrier_rejected"
 	OpStatusChanged   = "message.status_changed"
+	OpMessageMO       = "message.mo"
 )
 
 type Envelope struct {
@@ -163,4 +164,12 @@ type WebhookBody struct {
 	Event     string               `json:"event"`
 	CreatedAt time.Time            `json:"created_at"`
 	Data      MessageStatusChanged `json:"data"`
+}
+
+type MoReceived struct {
+	RouteID    string    `json:"route_id"`
+	From       string    `json:"from"`
+	To         string    `json:"to"`
+	Text       string    `json:"text"`
+	ReceivedAt time.Time `json:"received_at"`
 }
