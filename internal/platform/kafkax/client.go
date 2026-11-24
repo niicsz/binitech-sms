@@ -19,6 +19,10 @@ func ProducerOptions(brokers []string, clientID string) []kgo.Opt {
 }
 
 func ConsumerOptions(brokers []string, clientID, group string, topics ...string) []kgo.Opt {
+	return append(DelayedConsumerOptions(brokers, clientID, group, topics...), kgo.BlockRebalanceOnPoll())
+}
+
+func DelayedConsumerOptions(brokers []string, clientID, group string, topics ...string) []kgo.Opt {
 	return []kgo.Opt{
 		kgo.SeedBrokers(brokers...),
 		kgo.ClientID(clientID),
@@ -26,7 +30,6 @@ func ConsumerOptions(brokers []string, clientID, group string, topics ...string)
 		kgo.ConsumeTopics(topics...),
 		kgo.DisableAutoCommit(),
 		kgo.Balancers(kgo.CooperativeStickyBalancer()),
-		kgo.BlockRebalanceOnPoll(),
 		kgo.FetchMaxWait(500 * time.Millisecond),
 	}
 }

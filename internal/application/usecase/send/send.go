@@ -13,6 +13,7 @@ import (
 	"github.com/niicsz/binitech-sms/internal/application/apperr"
 	"github.com/niicsz/binitech-sms/internal/application/port/in"
 	"github.com/niicsz/binitech-sms/internal/application/port/out"
+	"github.com/niicsz/binitech-sms/internal/application/usecase/eventing"
 	"github.com/niicsz/binitech-sms/internal/contract/events"
 	"github.com/niicsz/binitech-sms/internal/domain/apikey"
 	"github.com/niicsz/binitech-sms/internal/domain/message"
@@ -27,7 +28,6 @@ const (
 	maxSender       = 11
 	maxWebhookRef   = 64
 	maxIdemKey      = 64
-	fastPublishWait = 300 * time.Millisecond
 )
 
 type Deps struct {
@@ -40,8 +40,7 @@ type Deps struct {
 	Senders      out.SenderRepository
 	Messages     out.MessageRepository
 	Idempotency  out.IdempotencyStore
-	Outbox       out.Outbox
-	Publisher    out.EventPublisher
+	Events       *eventing.Emitter
 	Clock        out.Clock
 	IDs          out.IDGenerator
 	Env          string
@@ -136,8 +135,8 @@ func (s *Service) Send(ctx context.Context, cmd in.SendCommand) (in.SendResult, 
 	}
 
 	var (
-		replay   *in.SendResult
-		outboxID int64
+		replay *in.SendResult
+		staged eventing.Staged
 	)
 	err = s.d.Tx.WithinTx(ctx, func(ctx context.Context) error {
 		if cmd.IdempotencyKey != "" {
@@ -165,8 +164,8 @@ func (s *Service) Send(ctx context.Context, cmd in.SendCommand) (in.SendResult, 
 		if err := s.d.Messages.Insert(ctx, msg); err != nil {
 			return fmt.Errorf("mensagem: %w", err)
 		}
-		if outboxID, err = s.d.Outbox.Enqueue(ctx, envelope); err != nil {
-			return fmt.Errorf("outbox: %w", err)
+		if err := s.d.Events.Stage(ctx, &staged, envelope); err != nil {
+			return err
 		}
 		if cmd.IdempotencyKey != "" {
 			stored, err := json.Marshal(result)
@@ -183,7 +182,7 @@ func (s *Service) Send(ctx context.Context, cmd in.SendCommand) (in.SendResult, 
 	if replay != nil {
 		return *replay, nil
 	}
-	s.fastPublish(ctx, outboxID, envelope)
+	s.d.Events.Flush(ctx, &staged)
 	return result, nil
 }
 
@@ -210,7 +209,7 @@ func (s *Service) claimIdempotency(ctx context.Context, cmd in.SendCommand, acco
 }
 
 func (s *Service) submittedEvent(msg out.StoredMessage, now time.Time) (events.Envelope, error) {
-	payload, err := json.Marshal(events.MessageSubmitted{
+	return s.d.Events.Envelope(events.TopicSubmit(s.d.Env), msg.AccountID, events.OpMessageSubmit, msg.AccountID, events.MessageSubmitted{
 		MessageID:   msg.ID,
 		AccountID:   msg.AccountID,
 		To:          msg.To.String(),
@@ -225,30 +224,6 @@ func (s *Service) submittedEvent(msg out.StoredMessage, now time.Time) (events.E
 		Test:        msg.Test,
 		SubmittedAt: now,
 	})
-	if err != nil {
-		return events.Envelope{}, err
-	}
-	return events.Envelope{
-		Topic: events.TopicSubmit(s.d.Env),
-		Key:   msg.AccountID,
-		Headers: map[string]string{
-			events.HeaderOperation:  events.OpMessageSubmit,
-			events.HeaderOpID:       s.d.IDs.OpID(),
-			events.HeaderSchema:     events.SchemaV1,
-			events.HeaderAccountID:  msg.AccountID,
-			events.HeaderProducedAt: now.Format(time.RFC3339Nano),
-		},
-		Payload: payload,
-	}, nil
-}
-
-func (s *Service) fastPublish(ctx context.Context, outboxID int64, envelope events.Envelope) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), fastPublishWait)
-	defer cancel()
-	if err := s.d.Publisher.Publish(ctx, envelope); err != nil {
-		return
-	}
-	_ = s.d.Outbox.MarkPublished(ctx, []int64{outboxID}, s.d.Clock.Now())
 }
 
 func validate(cmd in.SendCommand) (prepared, error) {

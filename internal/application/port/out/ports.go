@@ -39,3 +39,7 @@ type HealthChecker interface {
 	Name() string
 	Check(ctx context.Context) error
 }
+
+type ProcessedOps interface {
+	MarkOnce(ctx context.Context, consumer, opID string) (bool, error)
+}

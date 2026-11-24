@@ -20,6 +20,7 @@ import (
 	"github.com/niicsz/binitech-sms/internal/application/port/in"
 	"github.com/niicsz/binitech-sms/internal/application/port/out"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/auth"
+	"github.com/niicsz/binitech-sms/internal/application/usecase/eventing"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/query"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/readiness"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/send"
@@ -71,8 +72,7 @@ func (c CoreAPI) Handler() http.Handler {
 		Senders:      catalog,
 		Messages:     messages,
 		Idempotency:  postgres.NewIdempotency(c.Pool),
-		Outbox:       postgres.NewOutboxRepository(c.Pool),
-		Publisher:    kafkaadapter.NewPublisher(c.Kafka),
+		Events:       eventing.NewEmitter(postgres.NewOutboxRepository(c.Pool), kafkaadapter.NewPublisher(c.Kafka), clock, system.NewIDs(clock)),
 		Clock:        clock,
 		IDs:          system.NewIDs(clock),
 		Env:          c.Env,
