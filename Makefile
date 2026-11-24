@@ -1,5 +1,5 @@
 COMPOSE := docker compose -f deploy/local/docker-compose.yml --env-file .env
-SERVICES := core-api outbox-relay router-worker route-adapter status-engine smsctl
+SERVICES := core-api outbox-relay router-worker route-adapter status-engine ledger-consumer webhook-dispatcher smsctl
 
 .PHONY: up down reset topics migrate generate test lint build run-api run-relay images
 

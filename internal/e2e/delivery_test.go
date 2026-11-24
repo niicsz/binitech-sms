@@ -18,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/niicsz/binitech-sms/internal/adapter/out/postgres"
+	"github.com/niicsz/binitech-sms/internal/adapter/out/webhookhttp"
 	"github.com/niicsz/binitech-sms/internal/bootstrap"
 	"github.com/niicsz/binitech-sms/internal/contract/events"
 	"github.com/niicsz/binitech-sms/internal/platform/kafkax"
@@ -45,6 +46,11 @@ func (e *env) startFlow(routeIDs ...string) map[string]string {
 	}
 	run(bootstrap.Worker{Name: "router", Topics: []string{submitTopic}, Handler: bootstrap.Router(e.pool, producer, catalog)})
 	run(bootstrap.Worker{Name: "status-engine", Topics: []string{events.TopicStatusDLR}, Handler: bootstrap.StatusEngine(e.pool, producer)})
+	run(bootstrap.Worker{Name: "ledger-consumer", Topics: []string{events.TopicLedgerEvents}, Handler: bootstrap.LedgerConsumer(e.pool)})
+	run(bootstrap.Worker{Name: "webhook-dispatcher", Topics: []string{events.TopicWebhookOutbound},
+		Handler: bootstrap.WebhookDispatcher(e.pool, producer, testBox(e.t), webhookhttp.NewWithOptions(webhookhttp.Options{
+			Timeout: 2 * time.Second, AllowPrivate: true, RootCAs: e.webhookCAs,
+		}))})
 	callbacks := map[string]string{}
 	for _, id := range routeIDs {
 		addr := freeAddr(e.t)

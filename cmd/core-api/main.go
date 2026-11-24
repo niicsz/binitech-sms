@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/niicsz/binitech-sms/internal/adapter/out/secretbox"
 	"github.com/niicsz/binitech-sms/internal/bootstrap"
 	"github.com/niicsz/binitech-sms/internal/platform/config"
 	"github.com/niicsz/binitech-sms/internal/platform/httpserver"
@@ -54,7 +55,13 @@ func run() error {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
+	box, err := secretbox.FromBase64(cfg.WebhookKey)
+	if err != nil {
+		return fmt.Errorf("WEBHOOK_SECRET_KEY: %w", err)
+	}
+
 	handler := bootstrap.CoreAPI{
+		SecretBox:  box,
 		Log:        log,
 		Env:        cfg.Env,
 		Pool:       pool,

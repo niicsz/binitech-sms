@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"crypto/rand"
 	"log/slog"
 	"net/http"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/niicsz/binitech-sms/internal/application/usecase/query"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/readiness"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/send"
+	"github.com/niicsz/binitech-sms/internal/application/usecase/webhook"
 )
 
 type CoreAPI struct {
@@ -38,6 +40,7 @@ type CoreAPI struct {
 	RatePerSec int
 	RateBurst  int
 	KeyCache   time.Duration
+	SecretBox  out.SecretBox
 }
 
 func (c CoreAPI) Handler() http.Handler {
@@ -85,5 +88,6 @@ func (c CoreAPI) Handler() http.Handler {
 		RateLimiter:   limiter,
 		Sender:        sender,
 		Queries:       query.New(accounts, balances, messages),
+		Webhooks:      webhook.NewManager(postgres.NewWebhooks(c.Pool), c.SecretBox, system.NewIDs(clock), clock, rand.Reader),
 	})
 }

@@ -1,6 +1,7 @@
 package events
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/niicsz/binitech-sms/internal/domain/money"
@@ -146,4 +147,20 @@ type LedgerDebited struct {
 	Currency  string       `json:"currency"`
 	Reason    string       `json:"reason"`
 	DebitedAt time.Time    `json:"debited_at"`
+}
+
+type WebhookTask struct {
+	DeliveryID string          `json:"delivery_id"`
+	WebhookID  string          `json:"webhook_id"`
+	AccountID  string          `json:"account_id"`
+	Event      string          `json:"event"`
+	Body       json.RawMessage `json:"body"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
+type WebhookBody struct {
+	ID        string               `json:"id"`
+	Event     string               `json:"event"`
+	CreatedAt time.Time            `json:"created_at"`
+	Data      MessageStatusChanged `json:"data"`
 }

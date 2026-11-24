@@ -19,8 +19,10 @@ import (
 	"github.com/niicsz/binitech-sms/internal/application/port/out"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/delivery"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/eventing"
+	"github.com/niicsz/binitech-sms/internal/application/usecase/ledger"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/routing"
 	"github.com/niicsz/binitech-sms/internal/application/usecase/status"
+	"github.com/niicsz/binitech-sms/internal/application/usecase/webhook"
 	"github.com/niicsz/binitech-sms/internal/domain/route"
 )
 
@@ -36,6 +38,14 @@ func Emitter(pool *pgxpool.Pool, client *kgo.Client) *eventing.Emitter {
 func Router(pool *pgxpool.Pool, client *kgo.Client, catalog *postgres.RouteCatalog) *routing.Router {
 	return routing.New(postgres.NewTxManager(pool), postgres.NewProcessedOps(pool), postgres.NewDelivery(pool), catalog,
 		Emitter(pool, client), rand.IntN)
+}
+
+func LedgerConsumer(pool *pgxpool.Pool) *ledger.Consumer {
+	return ledger.New(postgres.NewTxManager(pool), postgres.NewProcessedOps(pool), postgres.NewBalances(pool))
+}
+
+func WebhookDispatcher(pool *pgxpool.Pool, client *kgo.Client, box out.SecretBox, sender out.WebhookSender) *webhook.Dispatcher {
+	return webhook.NewDispatcher(postgres.NewWebhooks(pool), box, sender, Emitter(pool, client))
 }
 
 func StatusEngine(pool *pgxpool.Pool, client *kgo.Client) *status.Engine {

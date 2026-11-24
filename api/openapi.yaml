@@ -11,6 +11,7 @@ security:
 tags:
   - name: Account
   - name: Messages
+  - name: Webhooks
 
 paths:
   /v1/account/balance:
@@ -70,6 +71,90 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/webhook:
+    get:
+      tags: [Webhooks]
+      operationId: listWebhooks
+      summary: Lista os webhooks da conta
+      responses:
+        '200':
+          description: Webhooks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookListEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Webhooks]
+      operationId: createWebhook
+      summary: Cria um webhook e devolve o segredo de assinatura uma única vez
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookRequest'
+      responses:
+        '201':
+          description: Webhook criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookCreatedEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /v1/webhook/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 40
+    get:
+      tags: [Webhooks]
+      operationId: getWebhook
+      summary: Consulta um webhook
+      responses:
+        '200':
+          description: Webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      tags: [Webhooks]
+      operationId: updateWebhook
+      summary: Altera um webhook; enable=true reativa um webhook desativado por falhas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookUpdateRequest'
+      responses:
+        '200':
+          description: Webhook alterado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [Webhooks]
+      operationId: deleteWebhook
+      summary: Remove um webhook
+      responses:
+        '204':
+          description: Removido
         default:
           $ref: '#/components/responses/Error'
 
@@ -268,3 +353,103 @@ components:
           type: string
         data:
           $ref: '#/components/schemas/Balance'
+
+    WebhookEvent:
+      type: string
+      enum: [message.submitted, message.delivered, message.failed]
+
+    WebhookRequest:
+      type: object
+      required: [url, events]
+      properties:
+        url:
+          type: string
+          description: URL https que recebe os eventos
+        events:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/WebhookEvent'
+        description:
+          type: string
+          maxLength: 200
+
+    WebhookUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/WebhookRequest'
+        - type: object
+          properties:
+            enable:
+              type: boolean
+
+    Webhook:
+      type: object
+      required: [id, url, events, enabled, failures, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookEvent'
+        description:
+          type: string
+        enabled:
+          type: boolean
+        failures:
+          type: integer
+        last_status:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WebhookCreated:
+      allOf:
+        - $ref: '#/components/schemas/Webhook'
+        - type: object
+          required: [secret]
+          properties:
+            secret:
+              type: string
+              description: Segredo para conferir o header X-BiniTech-Signature. Só aparece na criação.
+
+    WebhookEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Webhook'
+
+    WebhookCreatedEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/WebhookCreated'
+
+    WebhookListEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Webhook'
