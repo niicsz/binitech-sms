@@ -51,7 +51,7 @@ func WebhookDispatcher(pool *pgxpool.Pool, client *kgo.Client, box out.SecretBox
 }
 
 func StatusEngine(pool *pgxpool.Pool, client *kgo.Client) *status.Engine {
-	return status.New(postgres.NewTxManager(pool), postgres.NewProcessedOps(pool), postgres.NewDelivery(pool), Emitter(pool, client))
+	return status.New(postgres.NewTxManager(pool), postgres.NewProcessedOps(pool), postgres.NewDelivery(pool), Emitter(pool, client), postgres.NewEngagement(pool))
 }
 
 type RouteSettings struct {

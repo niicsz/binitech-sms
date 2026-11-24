@@ -138,6 +138,33 @@ func (e MessageStatus) Valid() bool {
 	}
 }
 
+// Defines values for OtpVerificationStatus.
+const (
+	OtpVerificationStatusBlocked  OtpVerificationStatus = "blocked"
+	OtpVerificationStatusExpired  OtpVerificationStatus = "expired"
+	OtpVerificationStatusInvalid  OtpVerificationStatus = "invalid"
+	OtpVerificationStatusUsed     OtpVerificationStatus = "used"
+	OtpVerificationStatusVerified OtpVerificationStatus = "verified"
+)
+
+// Valid indicates whether the value is a known member of the OtpVerificationStatus enum.
+func (e OtpVerificationStatus) Valid() bool {
+	switch e {
+	case OtpVerificationStatusBlocked:
+		return true
+	case OtpVerificationStatusExpired:
+		return true
+	case OtpVerificationStatusInvalid:
+		return true
+	case OtpVerificationStatusUsed:
+		return true
+	case OtpVerificationStatusVerified:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WebhookEvent.
 const (
 	MessageDelivered WebhookEvent = "message.delivered"
@@ -353,6 +380,57 @@ type MessagePageEnvelope struct {
 // MessageStatus defines model for MessageStatus.
 type MessageStatus string
 
+// OtpSendRequest defines model for OtpSendRequest.
+type OtpSendRequest struct {
+	From        string `json:"from"`
+	Length      *int   `json:"length,omitempty"`
+	MaxAttempts *int   `json:"max_attempts,omitempty"`
+
+	// Template Texto com o marcador de código; padrão em português
+	Template   *string `json:"template,omitempty"`
+	To         string  `json:"to"`
+	TtlSeconds *int    `json:"ttl_seconds,omitempty"`
+}
+
+// OtpSent defines model for OtpSent.
+type OtpSent struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	MessageId string    `json:"message_id"`
+	OtpId     string    `json:"otp_id"`
+
+	// TestCode Só aparece com chave sk_test_
+	TestCode *string `json:"test_code,omitempty"`
+}
+
+// OtpSentEnvelope defines model for OtpSentEnvelope.
+type OtpSentEnvelope struct {
+	Code    int     `json:"code"`
+	Data    OtpSent `json:"data"`
+	Message string  `json:"message"`
+}
+
+// OtpVerification defines model for OtpVerification.
+type OtpVerification struct {
+	AttemptsLeft int                   `json:"attempts_left"`
+	Status       OtpVerificationStatus `json:"status"`
+}
+
+// OtpVerificationStatus defines model for OtpVerification.Status.
+type OtpVerificationStatus string
+
+// OtpVerifyEnvelope defines model for OtpVerifyEnvelope.
+type OtpVerifyEnvelope struct {
+	Code    int             `json:"code"`
+	Data    OtpVerification `json:"data"`
+	Message string          `json:"message"`
+}
+
+// OtpVerifyRequest defines model for OtpVerifyRequest.
+type OtpVerifyRequest struct {
+	Code  string `json:"code"`
+	OtpId string `json:"otp_id"`
+}
+
 // SendBulkRequest defines model for SendBulkRequest.
 type SendBulkRequest struct {
 	From            string     `json:"from"`
@@ -398,6 +476,28 @@ type SendResult struct {
 	Segments  int           `json:"segments"`
 	Status    MessageStatus `json:"status"`
 	Test      *bool         `json:"test,omitempty"`
+}
+
+// ShortLink defines model for ShortLink.
+type ShortLink struct {
+	Code     string `json:"code"`
+	LinkId   string `json:"link_id"`
+	ShortUrl string `json:"short_url"`
+	Url      string `json:"url"`
+}
+
+// ShortLinkEnvelope defines model for ShortLinkEnvelope.
+type ShortLinkEnvelope struct {
+	Code    int       `json:"code"`
+	Data    ShortLink `json:"data"`
+	Message string    `json:"message"`
+}
+
+// ShortenRequest defines model for ShortenRequest.
+type ShortenRequest struct {
+	CampaignId *string `json:"campaign_id,omitempty"`
+	MessageId  *string `json:"message_id,omitempty"`
+	Url        string  `json:"url"`
 }
 
 // Webhook defines model for Webhook.
@@ -503,14 +603,28 @@ type SendBulkParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// SendOtpParams defines parameters for SendOtp.
+type SendOtpParams struct {
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // CreateCampaignJSONRequestBody defines body for CreateCampaign for application/json ContentType.
 type CreateCampaignJSONRequestBody = CampaignRequest
+
+// ShortenLinkJSONRequestBody defines body for ShortenLink for application/json ContentType.
+type ShortenLinkJSONRequestBody = ShortenRequest
 
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody = SendMessageRequest
 
 // SendBulkJSONRequestBody defines body for SendBulk for application/json ContentType.
 type SendBulkJSONRequestBody = SendBulkRequest
+
+// SendOtpJSONRequestBody defines body for SendOtp for application/json ContentType.
+type SendOtpJSONRequestBody = OtpSendRequest
+
+// VerifyOtpJSONRequestBody defines body for VerifyOtp for application/json ContentType.
+type VerifyOtpJSONRequestBody = OtpVerifyRequest
 
 // CreateWebhookJSONRequestBody defines body for CreateWebhook for application/json ContentType.
 type CreateWebhookJSONRequestBody = WebhookRequest
@@ -532,6 +646,9 @@ type ServerInterface interface {
 	// CampaignSummary Andamento e resultado da campanha
 	// (GET /v1/campaign/{id}/summary)
 	CampaignSummary(w http.ResponseWriter, r *http.Request, id string)
+	// ShortenLink Cria um link curto com contagem de cliques
+	// (POST /v1/link/shorten)
+	ShortenLink(w http.ResponseWriter, r *http.Request)
 	// ListMessages Lista mensagens da conta, das mais novas para as mais antigas, com paginação por cursor
 	// (GET /v1/message/list)
 	ListMessages(w http.ResponseWriter, r *http.Request, params ListMessagesParams)
@@ -544,6 +661,12 @@ type ServerInterface interface {
 	// GetMessage Status, segmentos e custo de uma mensagem
 	// (GET /v1/message/{id})
 	GetMessage(w http.ResponseWriter, r *http.Request, id string)
+	// SendOtp Gera um código, guarda só o HMAC e envia por SMS
+	// (POST /v1/otp/send)
+	SendOtp(w http.ResponseWriter, r *http.Request, params SendOtpParams)
+	// VerifyOtp Confere o código; status verified, invalid, expired, blocked ou used
+	// (POST /v1/otp/verify)
+	VerifyOtp(w http.ResponseWriter, r *http.Request)
 	// ListWebhooks Lista os webhooks da conta
 	// (GET /v1/webhook)
 	ListWebhooks(w http.ResponseWriter, r *http.Request)
@@ -588,6 +711,12 @@ func (_ Unimplemented) CampaignSummary(w http.ResponseWriter, r *http.Request, i
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ShortenLink Cria um link curto com contagem de cliques
+// (POST /v1/link/shorten)
+func (_ Unimplemented) ShortenLink(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ListMessages Lista mensagens da conta, das mais novas para as mais antigas, com paginação por cursor
 // (GET /v1/message/list)
 func (_ Unimplemented) ListMessages(w http.ResponseWriter, r *http.Request, params ListMessagesParams) {
@@ -609,6 +738,18 @@ func (_ Unimplemented) SendBulk(w http.ResponseWriter, r *http.Request, params S
 // GetMessage Status, segmentos e custo de uma mensagem
 // (GET /v1/message/{id})
 func (_ Unimplemented) GetMessage(w http.ResponseWriter, r *http.Request, id string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SendOtp Gera um código, guarda só o HMAC e envia por SMS
+// (POST /v1/otp/send)
+func (_ Unimplemented) SendOtp(w http.ResponseWriter, r *http.Request, params SendOtpParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// VerifyOtp Confere o código; status verified, invalid, expired, blocked ou used
+// (POST /v1/otp/verify)
+func (_ Unimplemented) VerifyOtp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -737,6 +878,20 @@ func (siw *ServerInterfaceWrapper) CampaignSummary(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CampaignSummary(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ShortenLink operation middleware
+func (siw *ServerInterfaceWrapper) ShortenLink(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ShortenLink(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -943,6 +1098,61 @@ func (siw *ServerInterfaceWrapper) GetMessage(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMessage(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SendOtp operation middleware
+func (siw *ServerInterfaceWrapper) SendOtp(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SendOtpParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendOtp(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyOtp operation middleware
+func (siw *ServerInterfaceWrapper) VerifyOtp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyOtp(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1197,6 +1407,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/v1/alphaname/list", wrapper.ListAlphanames)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/otp/send", wrapper.SendOtp)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/otp/verify", wrapper.VerifyOtp)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/link/shorten", wrapper.ShortenLink)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/webhook", wrapper.ListWebhooks)
 	})
 	r.Group(func(r chi.Router) {
@@ -1372,6 +1591,45 @@ func (response CampaignSummarydefaultJSONResponse) VisitCampaignSummaryResponse(
 	return err
 }
 
+type ShortenLinkRequestObject struct {
+	Body *ShortenLinkJSONRequestBody
+}
+
+type ShortenLinkResponseObject interface {
+	VisitShortenLinkResponse(w http.ResponseWriter) error
+}
+
+type ShortenLink201JSONResponse ShortLinkEnvelope
+
+func (response ShortenLink201JSONResponse) VisitShortenLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ShortenLinkdefaultJSONResponse struct {
+	Body       ErrorEnvelope
+	StatusCode int
+}
+
+func (response ShortenLinkdefaultJSONResponse) VisitShortenLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListMessagesRequestObject struct {
 	Params ListMessagesParams
 }
@@ -1519,6 +1777,85 @@ type GetMessagedefaultJSONResponse struct {
 }
 
 func (response GetMessagedefaultJSONResponse) VisitGetMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendOtpRequestObject struct {
+	Params SendOtpParams
+	Body   *SendOtpJSONRequestBody
+}
+
+type SendOtpResponseObject interface {
+	VisitSendOtpResponse(w http.ResponseWriter) error
+}
+
+type SendOtp202JSONResponse OtpSentEnvelope
+
+func (response SendOtp202JSONResponse) VisitSendOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendOtpdefaultJSONResponse struct {
+	Body       ErrorEnvelope
+	StatusCode int
+}
+
+func (response SendOtpdefaultJSONResponse) VisitSendOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyOtpRequestObject struct {
+	Body *VerifyOtpJSONRequestBody
+}
+
+type VerifyOtpResponseObject interface {
+	VisitVerifyOtpResponse(w http.ResponseWriter) error
+}
+
+type VerifyOtp200JSONResponse OtpVerifyEnvelope
+
+func (response VerifyOtp200JSONResponse) VisitVerifyOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyOtpdefaultJSONResponse struct {
+	Body       ErrorEnvelope
+	StatusCode int
+}
+
+func (response VerifyOtpdefaultJSONResponse) VisitVerifyOtpResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
@@ -1733,6 +2070,9 @@ type StrictServerInterface interface {
 	// CampaignSummary Andamento e resultado da campanha
 	// (GET /v1/campaign/{id}/summary)
 	CampaignSummary(ctx context.Context, request CampaignSummaryRequestObject) (CampaignSummaryResponseObject, error)
+	// ShortenLink Cria um link curto com contagem de cliques
+	// (POST /v1/link/shorten)
+	ShortenLink(ctx context.Context, request ShortenLinkRequestObject) (ShortenLinkResponseObject, error)
 	// ListMessages Lista mensagens da conta, das mais novas para as mais antigas, com paginação por cursor
 	// (GET /v1/message/list)
 	ListMessages(ctx context.Context, request ListMessagesRequestObject) (ListMessagesResponseObject, error)
@@ -1745,6 +2085,12 @@ type StrictServerInterface interface {
 	// GetMessage Status, segmentos e custo de uma mensagem
 	// (GET /v1/message/{id})
 	GetMessage(ctx context.Context, request GetMessageRequestObject) (GetMessageResponseObject, error)
+	// SendOtp Gera um código, guarda só o HMAC e envia por SMS
+	// (POST /v1/otp/send)
+	SendOtp(ctx context.Context, request SendOtpRequestObject) (SendOtpResponseObject, error)
+	// VerifyOtp Confere o código; status verified, invalid, expired, blocked ou used
+	// (POST /v1/otp/verify)
+	VerifyOtp(ctx context.Context, request VerifyOtpRequestObject) (VerifyOtpResponseObject, error)
 	// ListWebhooks Lista os webhooks da conta
 	// (GET /v1/webhook)
 	ListWebhooks(ctx context.Context, request ListWebhooksRequestObject) (ListWebhooksResponseObject, error)
@@ -1911,6 +2257,37 @@ func (sh *strictHandler) CampaignSummary(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// ShortenLink operation middleware
+func (sh *strictHandler) ShortenLink(w http.ResponseWriter, r *http.Request) {
+	var request ShortenLinkRequestObject
+
+	var body ShortenLinkJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ShortenLink(ctx, request.(ShortenLinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ShortenLink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ShortenLinkResponseObject); ok {
+		if err := validResponse.VisitShortenLinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListMessages operation middleware
 func (sh *strictHandler) ListMessages(w http.ResponseWriter, r *http.Request, params ListMessagesParams) {
 	var request ListMessagesRequestObject
@@ -2022,6 +2399,70 @@ func (sh *strictHandler) GetMessage(w http.ResponseWriter, r *http.Request, id s
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMessageResponseObject); ok {
 		if err := validResponse.VisitGetMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SendOtp operation middleware
+func (sh *strictHandler) SendOtp(w http.ResponseWriter, r *http.Request, params SendOtpParams) {
+	var request SendOtpRequestObject
+
+	request.Params = params
+
+	var body SendOtpJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.SendOtp(ctx, request.(SendOtpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SendOtp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SendOtpResponseObject); ok {
+		if err := validResponse.VisitSendOtpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyOtp operation middleware
+func (sh *strictHandler) VerifyOtp(w http.ResponseWriter, r *http.Request) {
+	var request VerifyOtpRequestObject
+
+	var body VerifyOtpJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.VerifyOtp(ctx, request.(VerifyOtpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyOtp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyOtpResponseObject); ok {
+		if err := validResponse.VisitVerifyOtpResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

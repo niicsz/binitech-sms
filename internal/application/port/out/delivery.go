@@ -11,6 +11,8 @@ import (
 
 var ErrCarrierUnavailable = errors.New("rota indisponível")
 
+const StatusMO = "MO"
+
 type RouteCatalog interface {
 	Routes(ctx context.Context) ([]route.Route, error)
 }

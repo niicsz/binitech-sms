@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/niicsz/binitech-sms/internal/application/port/in"
 	"github.com/niicsz/binitech-sms/internal/application/port/out"
@@ -19,16 +20,17 @@ const consumer = "status-engine"
 var ErrUnknownPart = errors.New("status: DLR de parte ainda desconhecida")
 
 type Engine struct {
-	tx     out.TxManager
-	ops    out.ProcessedOps
-	store  out.StatusStore
-	events *eventing.Emitter
+	tx      out.TxManager
+	ops     out.ProcessedOps
+	store   out.StatusStore
+	events  *eventing.Emitter
+	optOuts out.OptOutStore
 }
 
 var _ in.EventHandler = (*Engine)(nil)
 
-func New(tx out.TxManager, ops out.ProcessedOps, store out.StatusStore, emitter *eventing.Emitter) *Engine {
-	return &Engine{tx: tx, ops: ops, store: store, events: emitter}
+func New(tx out.TxManager, ops out.ProcessedOps, store out.StatusStore, emitter *eventing.Emitter, optOuts out.OptOutStore) *Engine {
+	return &Engine{tx: tx, ops: ops, store: store, events: emitter, optOuts: optOuts}
 }
 
 func (s *Engine) Handle(ctx context.Context, e in.Event) error {
@@ -66,6 +68,19 @@ func (s *Engine) Handle(ctx context.Context, e in.Event) error {
 			return in.Permanent(err)
 		}
 		apply = func(ctx context.Context, staged *eventing.Staged) error { return s.dlr(ctx, staged, m, opID) }
+	case events.OpMessageMO:
+		var m events.MoReceived
+		if err := json.Unmarshal(e.Payload, &m); err != nil {
+			return in.Permanent(err)
+		}
+		keyword, ok := OptOutKeyword(m.Text)
+		if !ok || s.optOuts == nil {
+			return nil
+		}
+		apply = func(ctx context.Context, _ *eventing.Staged) error {
+			_, err := s.optOuts.OptOut(ctx, m.To, normalizeMSISDN(m.From), keyword)
+			return err
+		}
 	default:
 		return nil
 	}
@@ -194,4 +209,20 @@ func (s *Engine) notify(ctx context.Context, staged *eventing.Staged, m out.Stor
 		return err
 	}
 	return s.events.Stage(ctx, staged, envelope)
+}
+
+var optOutWords = map[string]bool{"SAIR": true, "PARAR": true, "STOP": true, "CANCELAR": true, "DESCADASTRAR": true, "REMOVER": true}
+
+func OptOutKeyword(text string) (string, bool) {
+	word := strings.ToUpper(strings.TrimSpace(text))
+	word = strings.Trim(word, ".!,;: ")
+	if fields := strings.Fields(word); len(fields) > 0 {
+		word = fields[0]
+	}
+	return word, optOutWords[word]
+}
+
+func normalizeMSISDN(raw string) string {
+	digits := strings.TrimPrefix(strings.TrimSpace(raw), "+")
+	return "+" + digits
 }

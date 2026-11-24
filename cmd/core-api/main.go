@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"os"
@@ -60,8 +61,15 @@ func run() error {
 		return fmt.Errorf("WEBHOOK_SECRET_KEY: %w", err)
 	}
 
+	otpKey, err := base64.StdEncoding.DecodeString(cfg.OTPKey)
+	if err != nil || len(otpKey) < 32 {
+		return fmt.Errorf("OTP_HMAC_KEY precisa de 32 bytes em base64 (openssl rand -base64 32)")
+	}
+
 	handler := bootstrap.CoreAPI{
 		SecretBox:  box,
+		OTPKey:     otpKey,
+		LinkBase:   cfg.LinkBase,
 		Log:        log,
 		Env:        cfg.Env,
 		Pool:       pool,

@@ -88,6 +88,17 @@ func PumpReports(ctx context.Context, carrier out.Carrier, emitter *eventing.Emi
 			if !ok {
 				return
 			}
+			if report.Status == out.StatusMO {
+				envelope, err := emitter.Envelope(events.TopicStatusDLR, report.Raw["from"], events.OpMessageMO, "", events.MoReceived{
+					RouteID: report.RouteID, From: report.Raw["from"], To: report.Raw["to"], Text: report.Raw["text"], ReceivedAt: emitter.Now(),
+				})
+				if err != nil {
+					onError(err)
+					continue
+				}
+				publishWithRetry(ctx, emitter, envelope, onError)
+				continue
+			}
 			envelope, err := emitter.Envelope(events.TopicStatusDLR, report.RouteID+":"+report.ProviderID, events.OpMessageDLR, "", events.DlrReceived{
 				MessageID:      report.MessageID,
 				RouteID:        report.RouteID,

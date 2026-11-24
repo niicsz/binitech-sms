@@ -181,12 +181,23 @@ func (c *Carrier) handle(p pdu.Body) {
 			esm = v
 		}
 	}
-	if esm&esmDeliveryReceipt == 0 {
-		return
-	}
 	text := ""
 	if f := fields[pdufield.ShortMessage]; f != nil {
 		text = f.String()
+	}
+	if esm&esmDeliveryReceipt == 0 {
+		from, to := "", ""
+		if f := fields[pdufield.SourceAddr]; f != nil {
+			from = f.String()
+		}
+		if f := fields[pdufield.DestinationAddr]; f != nil {
+			to = f.String()
+		}
+		select {
+		case c.reports <- out.DeliveryReport{RouteID: c.id, Status: out.StatusMO, DoneAt: c.now(), Raw: map[string]string{"from": from, "to": to, "text": text}}:
+		case <-c.done:
+		}
+		return
 	}
 	receipt := ParseReceipt(text)
 	if receipt.ID == "" || receipt.Status == "" {
