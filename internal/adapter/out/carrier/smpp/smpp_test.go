@@ -23,6 +23,13 @@ type smsc struct {
 	reject   atomic.Uint32
 	mu       sync.Mutex
 	received []pdu.Body
+	wmu      sync.Mutex
+}
+
+func (s *smsc) write(c smpptest.Conn, p pdu.Body) {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+	_ = c.Write(p)
 }
 
 func newSMSC(t *testing.T) *smsc {
@@ -39,21 +46,23 @@ func newSMSC(t *testing.T) *smsc {
 			resp.Header().Seq = m.Header().Seq
 			if status := s.reject.Load(); status != 0 {
 				resp.Header().Status = pdu.Status(status)
-				_ = c.Write(resp)
+				s.write(c, resp)
 				return
 			}
 			id := fmt.Sprintf("%X", 0xA0+s.next.Add(1))
 			_ = resp.Fields().Set(pdufield.MessageID, id)
-			_ = c.Write(resp)
+			s.write(c, resp)
 			go func() {
 				time.Sleep(20 * time.Millisecond)
 				dlr := pdu.NewDeliverSM()
 				_ = dlr.Fields().Set(pdufield.ESMClass, uint8(0x04))
 				_ = dlr.Fields().Set(pdufield.ShortMessage, "id:"+id+" sub:001 dlvrd:001 submit date:2611241200 done date:2611241201 stat:DELIVRD err:000 text:")
-				_ = c.Write(dlr)
+				s.write(c, dlr)
 			}()
 		default:
+			s.wmu.Lock()
 			smpptest.EchoHandler(c, m)
+			s.wmu.Unlock()
 		}
 	}
 	s.server.Start()
