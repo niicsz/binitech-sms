@@ -28,6 +28,10 @@ type fakeOutbox struct {
 
 func (f *fakeOutbox) Enqueue(context.Context, events.Envelope) (int64, error) { return 0, nil }
 
+func (f *fakeOutbox) EnqueueMany(context.Context, []events.Envelope) ([]int64, error) {
+	return nil, nil
+}
+
 func (f *fakeOutbox) ClaimPending(_ context.Context, _ time.Duration, limit int) ([]out.OutboxRecord, error) {
 	if len(f.pending) > limit {
 		return f.pending[:limit], nil

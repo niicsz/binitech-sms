@@ -27,6 +27,7 @@ type OutboxRecord struct {
 
 type Outbox interface {
 	Enqueue(ctx context.Context, envelope events.Envelope) (int64, error)
+	EnqueueMany(ctx context.Context, envelopes []events.Envelope) ([]int64, error)
 	ClaimPending(ctx context.Context, olderThan time.Duration, limit int) ([]OutboxRecord, error)
 	MarkPublished(ctx context.Context, ids []int64, at time.Time) error
 }

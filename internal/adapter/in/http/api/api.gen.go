@@ -6,6 +6,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -13,6 +14,75 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
 )
+
+// Defines values for AlphanameKind.
+const (
+	Alphanumeric AlphanameKind = "alphanumeric"
+	Longcode     AlphanameKind = "longcode"
+	Shortcode    AlphanameKind = "shortcode"
+)
+
+// Valid indicates whether the value is a known member of the AlphanameKind enum.
+func (e AlphanameKind) Valid() bool {
+	switch e {
+	case Alphanumeric:
+		return true
+	case Longcode:
+		return true
+	case Shortcode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AlphanameStatus.
+const (
+	AlphanameStatusApproved AlphanameStatus = "approved"
+	AlphanameStatusPending  AlphanameStatus = "pending"
+	AlphanameStatusRejected AlphanameStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the AlphanameStatus enum.
+func (e AlphanameStatus) Valid() bool {
+	switch e {
+	case AlphanameStatusApproved:
+		return true
+	case AlphanameStatusPending:
+		return true
+	case AlphanameStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CampaignSummaryStatus.
+const (
+	Cancelled CampaignSummaryStatus = "cancelled"
+	Done      CampaignSummaryStatus = "done"
+	Paused    CampaignSummaryStatus = "paused"
+	Running   CampaignSummaryStatus = "running"
+	Scheduled CampaignSummaryStatus = "scheduled"
+)
+
+// Valid indicates whether the value is a known member of the CampaignSummaryStatus enum.
+func (e CampaignSummaryStatus) Valid() bool {
+	switch e {
+	case Cancelled:
+		return true
+	case Done:
+		return true
+	case Paused:
+		return true
+	case Running:
+		return true
+	case Scheduled:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for Encoding.
 const (
@@ -34,34 +104,34 @@ func (e Encoding) Valid() bool {
 
 // Defines values for MessageStatus.
 const (
-	Accepted    MessageStatus = "accepted"
-	Delivered   MessageStatus = "delivered"
-	Expired     MessageStatus = "expired"
-	Failed      MessageStatus = "failed"
-	Rejected    MessageStatus = "rejected"
-	Routed      MessageStatus = "routed"
-	Submitted   MessageStatus = "submitted"
-	Undelivered MessageStatus = "undelivered"
+	MessageStatusAccepted    MessageStatus = "accepted"
+	MessageStatusDelivered   MessageStatus = "delivered"
+	MessageStatusExpired     MessageStatus = "expired"
+	MessageStatusFailed      MessageStatus = "failed"
+	MessageStatusRejected    MessageStatus = "rejected"
+	MessageStatusRouted      MessageStatus = "routed"
+	MessageStatusSubmitted   MessageStatus = "submitted"
+	MessageStatusUndelivered MessageStatus = "undelivered"
 )
 
 // Valid indicates whether the value is a known member of the MessageStatus enum.
 func (e MessageStatus) Valid() bool {
 	switch e {
-	case Accepted:
+	case MessageStatusAccepted:
 		return true
-	case Delivered:
+	case MessageStatusDelivered:
 		return true
-	case Expired:
+	case MessageStatusExpired:
 		return true
-	case Failed:
+	case MessageStatusFailed:
 		return true
-	case Rejected:
+	case MessageStatusRejected:
 		return true
-	case Routed:
+	case MessageStatusRouted:
 		return true
-	case Submitted:
+	case MessageStatusSubmitted:
 		return true
-	case Undelivered:
+	case MessageStatusUndelivered:
 		return true
 	default:
 		return false
@@ -89,6 +159,27 @@ func (e WebhookEvent) Valid() bool {
 	}
 }
 
+// Alphaname defines model for Alphaname.
+type Alphaname struct {
+	Countries []string        `json:"countries"`
+	Kind      AlphanameKind   `json:"kind"`
+	Sender    string          `json:"sender"`
+	Status    AlphanameStatus `json:"status"`
+}
+
+// AlphanameKind defines model for Alphaname.Kind.
+type AlphanameKind string
+
+// AlphanameStatus defines model for Alphaname.Status.
+type AlphanameStatus string
+
+// AlphanameListEnvelope defines model for AlphanameListEnvelope.
+type AlphanameListEnvelope struct {
+	Code    int         `json:"code"`
+	Data    []Alphaname `json:"data"`
+	Message string      `json:"message"`
+}
+
 // Balance defines model for Balance.
 type Balance struct {
 	Available string `json:"available"`
@@ -103,6 +194,101 @@ type BalanceEnvelope struct {
 	Data    Balance `json:"data"`
 	Message string  `json:"message"`
 }
+
+// BulkAccepted defines model for BulkAccepted.
+type BulkAccepted struct {
+	Cost      string `json:"cost"`
+	Index     int    `json:"index"`
+	MessageId string `json:"message_id"`
+	Segments  int    `json:"segments"`
+}
+
+// BulkEnvelope defines model for BulkEnvelope.
+type BulkEnvelope struct {
+	Code    int        `json:"code"`
+	Data    BulkResult `json:"data"`
+	Message string     `json:"message"`
+}
+
+// BulkItem defines model for BulkItem.
+type BulkItem struct {
+	// Text Texto próprio deste destino; sem ele vale o texto do lote
+	Text       *string `json:"text,omitempty"`
+	To         string  `json:"to"`
+	WebhookRef *string `json:"webhook_ref,omitempty"`
+}
+
+// BulkRejected defines model for BulkRejected.
+type BulkRejected struct {
+	Field   *string `json:"field,omitempty"`
+	Index   int     `json:"index"`
+	Message string  `json:"message"`
+}
+
+// BulkResult defines model for BulkResult.
+type BulkResult struct {
+	Accepted  []BulkAccepted `json:"accepted"`
+	Currency  string         `json:"currency"`
+	Rejected  []BulkRejected `json:"rejected"`
+	Test      bool           `json:"test"`
+	TotalCost string         `json:"total_cost"`
+}
+
+// CampaignEnvelope defines model for CampaignEnvelope.
+type CampaignEnvelope struct {
+	Code    int             `json:"code"`
+	Data    CampaignSummary `json:"data"`
+	Message string          `json:"message"`
+}
+
+// CampaignRecipient defines model for CampaignRecipient.
+type CampaignRecipient struct {
+	To   string             `json:"to"`
+	Vars *map[string]string `json:"vars,omitempty"`
+}
+
+// CampaignRequest defines model for CampaignRequest.
+type CampaignRequest struct {
+	From        string              `json:"from"`
+	Name        string              `json:"name"`
+	Normalize   *bool               `json:"normalize,omitempty"`
+	Recipients  []CampaignRecipient `json:"recipients"`
+	ScheduledAt time.Time           `json:"scheduled_at"`
+	Text        string              `json:"text"`
+
+	// TimeZone Fuso IANA; padrão America/Sao_Paulo
+	TimeZone        *string `json:"time_zone,omitempty"`
+	ValidityMinutes *int    `json:"validity_minutes,omitempty"`
+
+	// WindowEnd Fim do horário permitido em HH:MM
+	WindowEnd *string `json:"window_end,omitempty"`
+
+	// WindowStart Início do horário permitido em HH:MM no fuso time_zone
+	WindowStart *string `json:"window_start,omitempty"`
+}
+
+// CampaignSummary defines model for CampaignSummary.
+type CampaignSummary struct {
+	CampaignId  string                `json:"campaign_id"`
+	Cost        string                `json:"cost"`
+	Currency    string                `json:"currency"`
+	Delivered   int                   `json:"delivered"`
+	Failed      int                   `json:"failed"`
+	FinishedAt  *time.Time            `json:"finished_at,omitempty"`
+	InFlight    int                   `json:"in_flight"`
+	Name        string                `json:"name"`
+	Pending     int                   `json:"pending"`
+	Rejected    int                   `json:"rejected"`
+	ScheduledAt time.Time             `json:"scheduled_at"`
+	StartedAt   *time.Time            `json:"started_at,omitempty"`
+	Status      CampaignSummaryStatus `json:"status"`
+	Submitted   int                   `json:"submitted"`
+	Test        bool                  `json:"test"`
+	Total       int                   `json:"total"`
+}
+
+// CampaignSummaryStatus defines model for CampaignSummary.Status.
+type CampaignSummaryStatus string
 
 // Encoding defines model for Encoding.
 type Encoding string
@@ -151,8 +337,30 @@ type MessageEnvelope struct {
 	Message string  `json:"message"`
 }
 
+// MessagePage defines model for MessagePage.
+type MessagePage struct {
+	Items      []Message `json:"items"`
+	NextCursor *string   `json:"next_cursor,omitempty"`
+}
+
+// MessagePageEnvelope defines model for MessagePageEnvelope.
+type MessagePageEnvelope struct {
+	Code    int         `json:"code"`
+	Data    MessagePage `json:"data"`
+	Message string      `json:"message"`
+}
+
 // MessageStatus defines model for MessageStatus.
 type MessageStatus string
+
+// SendBulkRequest defines model for SendBulkRequest.
+type SendBulkRequest struct {
+	From            string     `json:"from"`
+	Messages        []BulkItem `json:"messages"`
+	Normalize       *bool      `json:"normalize,omitempty"`
+	Text            *string    `json:"text,omitempty"`
+	ValidityMinutes *int       `json:"validity_minutes,omitempty"`
+}
 
 // SendMessageEnvelope defines model for SendMessageEnvelope.
 type SendMessageEnvelope struct {
@@ -270,13 +478,39 @@ type IdempotencyKey = string
 // Error defines model for Error.
 type Error = ErrorEnvelope
 
+// CreateCampaignParams defines parameters for CreateCampaign.
+type CreateCampaignParams struct {
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListMessagesParams defines parameters for ListMessages.
+type ListMessagesParams struct {
+	From       *time.Time     `form:"from,omitempty" json:"from,omitempty"`
+	To         *time.Time     `form:"to,omitempty" json:"to,omitempty"`
+	Status     *MessageStatus `form:"status,omitempty" json:"status,omitempty"`
+	CampaignId *string        `form:"campaign_id,omitempty" json:"campaign_id,omitempty"`
+	Limit      *int           `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor     *string        `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // SendMessageParams defines parameters for SendMessage.
 type SendMessageParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// SendBulkParams defines parameters for SendBulk.
+type SendBulkParams struct {
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateCampaignJSONRequestBody defines body for CreateCampaign for application/json ContentType.
+type CreateCampaignJSONRequestBody = CampaignRequest
+
 // SendMessageJSONRequestBody defines body for SendMessage for application/json ContentType.
 type SendMessageJSONRequestBody = SendMessageRequest
+
+// SendBulkJSONRequestBody defines body for SendBulk for application/json ContentType.
+type SendBulkJSONRequestBody = SendBulkRequest
 
 // CreateWebhookJSONRequestBody defines body for CreateWebhook for application/json ContentType.
 type CreateWebhookJSONRequestBody = WebhookRequest
@@ -289,9 +523,24 @@ type ServerInterface interface {
 	// GetBalance Saldo disponível e reservado da conta
 	// (GET /v1/account/balance)
 	GetBalance(w http.ResponseWriter, r *http.Request)
+	// ListAlphanames Remetentes da conta e situação da aprovação
+	// (GET /v1/alphaname/list)
+	ListAlphanames(w http.ResponseWriter, r *http.Request)
+	// CreateCampaign Agenda uma campanha; o texto aceita variáveis por destinatário no formato chave entre chaves duplas
+	// (POST /v1/campaign/create)
+	CreateCampaign(w http.ResponseWriter, r *http.Request, params CreateCampaignParams)
+	// CampaignSummary Andamento e resultado da campanha
+	// (GET /v1/campaign/{id}/summary)
+	CampaignSummary(w http.ResponseWriter, r *http.Request, id string)
+	// ListMessages Lista mensagens da conta, das mais novas para as mais antigas, com paginação por cursor
+	// (GET /v1/message/list)
+	ListMessages(w http.ResponseWriter, r *http.Request, params ListMessagesParams)
 	// SendMessage Envia um SMS
 	// (POST /v1/message/send)
 	SendMessage(w http.ResponseWriter, r *http.Request, params SendMessageParams)
+	// SendBulk Envia até 10.000 SMS num lote; destinos inválidos são listados sem barrar o resto
+	// (POST /v1/message/sendBulk)
+	SendBulk(w http.ResponseWriter, r *http.Request, params SendBulkParams)
 	// GetMessage Status, segmentos e custo de uma mensagem
 	// (GET /v1/message/{id})
 	GetMessage(w http.ResponseWriter, r *http.Request, id string)
@@ -321,9 +570,39 @@ func (_ Unimplemented) GetBalance(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListAlphanames Remetentes da conta e situação da aprovação
+// (GET /v1/alphaname/list)
+func (_ Unimplemented) ListAlphanames(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateCampaign Agenda uma campanha; o texto aceita variáveis por destinatário no formato chave entre chaves duplas
+// (POST /v1/campaign/create)
+func (_ Unimplemented) CreateCampaign(w http.ResponseWriter, r *http.Request, params CreateCampaignParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CampaignSummary Andamento e resultado da campanha
+// (GET /v1/campaign/{id}/summary)
+func (_ Unimplemented) CampaignSummary(w http.ResponseWriter, r *http.Request, id string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListMessages Lista mensagens da conta, das mais novas para as mais antigas, com paginação por cursor
+// (GET /v1/message/list)
+func (_ Unimplemented) ListMessages(w http.ResponseWriter, r *http.Request, params ListMessagesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // SendMessage Envia um SMS
 // (POST /v1/message/send)
 func (_ Unimplemented) SendMessage(w http.ResponseWriter, r *http.Request, params SendMessageParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SendBulk Envia até 10.000 SMS num lote; destinos inválidos são listados sem barrar o resto
+// (POST /v1/message/sendBulk)
+func (_ Unimplemented) SendBulk(w http.ResponseWriter, r *http.Request, params SendBulkParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -386,6 +665,185 @@ func (siw *ServerInterfaceWrapper) GetBalance(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListAlphanames operation middleware
+func (siw *ServerInterfaceWrapper) ListAlphanames(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAlphanames(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCampaign operation middleware
+func (siw *ServerInterfaceWrapper) CreateCampaign(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateCampaignParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCampaign(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CampaignSummary operation middleware
+func (siw *ServerInterfaceWrapper) CampaignSummary(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CampaignSummary(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMessages operation middleware
+func (siw *ServerInterfaceWrapper) ListMessages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMessagesParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "campaign_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "campaign_id", r.URL.Query(), &params.CampaignId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "campaign_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "campaign_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMessages(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SendMessage operation middleware
 func (siw *ServerInterfaceWrapper) SendMessage(w http.ResponseWriter, r *http.Request) {
 
@@ -418,6 +876,47 @@ func (siw *ServerInterfaceWrapper) SendMessage(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SendMessage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SendBulk operation middleware
+func (siw *ServerInterfaceWrapper) SendBulk(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SendBulkParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendBulk(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -683,6 +1182,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/v1/message/{id}", wrapper.GetMessage)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/message/sendBulk", wrapper.SendBulk)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/message/list", wrapper.ListMessages)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/campaign/create", wrapper.CreateCampaign)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/campaign/{id}/summary", wrapper.CampaignSummary)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/alphaname/list", wrapper.ListAlphanames)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/webhook", wrapper.ListWebhooks)
 	})
 	r.Group(func(r chi.Router) {
@@ -741,6 +1255,162 @@ func (response GetBalancedefaultJSONResponse) VisitGetBalanceResponse(w http.Res
 	return err
 }
 
+type ListAlphanamesRequestObject struct {
+}
+
+type ListAlphanamesResponseObject interface {
+	VisitListAlphanamesResponse(w http.ResponseWriter) error
+}
+
+type ListAlphanames200JSONResponse AlphanameListEnvelope
+
+func (response ListAlphanames200JSONResponse) VisitListAlphanamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAlphanamesdefaultJSONResponse struct {
+	Body       ErrorEnvelope
+	StatusCode int
+}
+
+func (response ListAlphanamesdefaultJSONResponse) VisitListAlphanamesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCampaignRequestObject struct {
+	Params CreateCampaignParams
+	Body   *CreateCampaignJSONRequestBody
+}
+
+type CreateCampaignResponseObject interface {
+	VisitCreateCampaignResponse(w http.ResponseWriter) error
+}
+
+type CreateCampaign201JSONResponse CampaignEnvelope
+
+func (response CreateCampaign201JSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCampaigndefaultJSONResponse struct {
+	Body       ErrorEnvelope
+	StatusCode int
+}
+
+func (response CreateCampaigndefaultJSONResponse) VisitCreateCampaignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CampaignSummaryRequestObject struct {
+	Id string `json:"id"`
+}
+
+type CampaignSummaryResponseObject interface {
+	VisitCampaignSummaryResponse(w http.ResponseWriter) error
+}
+
+type CampaignSummary200JSONResponse CampaignEnvelope
+
+func (response CampaignSummary200JSONResponse) VisitCampaignSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CampaignSummarydefaultJSONResponse struct {
+	Body       ErrorEnvelope
+	StatusCode int
+}
+
+func (response CampaignSummarydefaultJSONResponse) VisitCampaignSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessagesRequestObject struct {
+	Params ListMessagesParams
+}
+
+type ListMessagesResponseObject interface {
+	VisitListMessagesResponse(w http.ResponseWriter) error
+}
+
+type ListMessages200JSONResponse MessagePageEnvelope
+
+func (response ListMessages200JSONResponse) VisitListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMessagesdefaultJSONResponse struct {
+	Body       ErrorEnvelope
+	StatusCode int
+}
+
+func (response ListMessagesdefaultJSONResponse) VisitListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SendMessageRequestObject struct {
 	Params SendMessageParams
 	Body   *SendMessageJSONRequestBody
@@ -770,6 +1440,46 @@ type SendMessagedefaultJSONResponse struct {
 }
 
 func (response SendMessagedefaultJSONResponse) VisitSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendBulkRequestObject struct {
+	Params SendBulkParams
+	Body   *SendBulkJSONRequestBody
+}
+
+type SendBulkResponseObject interface {
+	VisitSendBulkResponse(w http.ResponseWriter) error
+}
+
+type SendBulk202JSONResponse BulkEnvelope
+
+func (response SendBulk202JSONResponse) VisitSendBulkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SendBulkdefaultJSONResponse struct {
+	Body       ErrorEnvelope
+	StatusCode int
+}
+
+func (response SendBulkdefaultJSONResponse) VisitSendBulkResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
@@ -1014,9 +1724,24 @@ type StrictServerInterface interface {
 	// GetBalance Saldo disponível e reservado da conta
 	// (GET /v1/account/balance)
 	GetBalance(ctx context.Context, request GetBalanceRequestObject) (GetBalanceResponseObject, error)
+	// ListAlphanames Remetentes da conta e situação da aprovação
+	// (GET /v1/alphaname/list)
+	ListAlphanames(ctx context.Context, request ListAlphanamesRequestObject) (ListAlphanamesResponseObject, error)
+	// CreateCampaign Agenda uma campanha; o texto aceita variáveis por destinatário no formato chave entre chaves duplas
+	// (POST /v1/campaign/create)
+	CreateCampaign(ctx context.Context, request CreateCampaignRequestObject) (CreateCampaignResponseObject, error)
+	// CampaignSummary Andamento e resultado da campanha
+	// (GET /v1/campaign/{id}/summary)
+	CampaignSummary(ctx context.Context, request CampaignSummaryRequestObject) (CampaignSummaryResponseObject, error)
+	// ListMessages Lista mensagens da conta, das mais novas para as mais antigas, com paginação por cursor
+	// (GET /v1/message/list)
+	ListMessages(ctx context.Context, request ListMessagesRequestObject) (ListMessagesResponseObject, error)
 	// SendMessage Envia um SMS
 	// (POST /v1/message/send)
 	SendMessage(ctx context.Context, request SendMessageRequestObject) (SendMessageResponseObject, error)
+	// SendBulk Envia até 10.000 SMS num lote; destinos inválidos são listados sem barrar o resto
+	// (POST /v1/message/sendBulk)
+	SendBulk(ctx context.Context, request SendBulkRequestObject) (SendBulkResponseObject, error)
 	// GetMessage Status, segmentos e custo de uma mensagem
 	// (GET /v1/message/{id})
 	GetMessage(ctx context.Context, request GetMessageRequestObject) (GetMessageResponseObject, error)
@@ -1103,6 +1828,115 @@ func (sh *strictHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListAlphanames operation middleware
+func (sh *strictHandler) ListAlphanames(w http.ResponseWriter, r *http.Request) {
+	var request ListAlphanamesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListAlphanames(ctx, request.(ListAlphanamesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAlphanames")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAlphanamesResponseObject); ok {
+		if err := validResponse.VisitListAlphanamesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateCampaign operation middleware
+func (sh *strictHandler) CreateCampaign(w http.ResponseWriter, r *http.Request, params CreateCampaignParams) {
+	var request CreateCampaignRequestObject
+
+	request.Params = params
+
+	var body CreateCampaignJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.CreateCampaign(ctx, request.(CreateCampaignRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateCampaign")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateCampaignResponseObject); ok {
+		if err := validResponse.VisitCreateCampaignResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CampaignSummary operation middleware
+func (sh *strictHandler) CampaignSummary(w http.ResponseWriter, r *http.Request, id string) {
+	var request CampaignSummaryRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.CampaignSummary(ctx, request.(CampaignSummaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CampaignSummary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CampaignSummaryResponseObject); ok {
+		if err := validResponse.VisitCampaignSummaryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMessages operation middleware
+func (sh *strictHandler) ListMessages(w http.ResponseWriter, r *http.Request, params ListMessagesParams) {
+	var request ListMessagesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListMessages(ctx, request.(ListMessagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMessages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMessagesResponseObject); ok {
+		if err := validResponse.VisitListMessagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SendMessage operation middleware
 func (sh *strictHandler) SendMessage(w http.ResponseWriter, r *http.Request, params SendMessageParams) {
 	var request SendMessageRequestObject
@@ -1129,6 +1963,39 @@ func (sh *strictHandler) SendMessage(w http.ResponseWriter, r *http.Request, par
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SendMessageResponseObject); ok {
 		if err := validResponse.VisitSendMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SendBulk operation middleware
+func (sh *strictHandler) SendBulk(w http.ResponseWriter, r *http.Request, params SendBulkParams) {
+	var request SendBulkRequestObject
+
+	request.Params = params
+
+	var body SendBulkJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.SendBulk(ctx, request.(SendBulkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SendBulk")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SendBulkResponseObject); ok {
+		if err := validResponse.VisitSendBulkResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

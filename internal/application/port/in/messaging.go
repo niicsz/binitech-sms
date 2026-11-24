@@ -81,3 +81,45 @@ type AccountQueries interface {
 	Message(ctx context.Context, principal Principal, id string) (MessageView, error)
 	Balance(ctx context.Context, principal Principal) (BalanceView, error)
 }
+
+type BulkItem struct {
+	To         string
+	Text       string
+	WebhookRef string
+}
+
+type BulkCommand struct {
+	Principal       Principal
+	IdempotencyKey  string
+	From            string
+	Text            string
+	Normalize       bool
+	ValidityMinutes int
+	Items           []BulkItem
+	CampaignID      string
+}
+
+type BulkAccepted struct {
+	Index     int          `json:"index"`
+	MessageID string       `json:"message_id"`
+	Segments  int          `json:"segments"`
+	Cost      money.Amount `json:"cost"`
+}
+
+type BulkRejected struct {
+	Index   int    `json:"index"`
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+type BulkResult struct {
+	Accepted  []BulkAccepted `json:"accepted"`
+	Rejected  []BulkRejected `json:"rejected"`
+	TotalCost money.Amount   `json:"total_cost"`
+	Currency  string         `json:"currency"`
+	Test      bool           `json:"test"`
+}
+
+type BulkSender interface {
+	SendBulk(ctx context.Context, cmd BulkCommand) (BulkResult, error)
+}

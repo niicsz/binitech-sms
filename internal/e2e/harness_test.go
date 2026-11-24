@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
+	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/niicsz/binitech-sms/internal/adapter/out/postgres"
 	"github.com/niicsz/binitech-sms/internal/adapter/out/secret"
@@ -182,4 +183,9 @@ func testBox(t *testing.T) *secretbox.AESGCM {
 		t.Fatal(err)
 	}
 	return box
+}
+
+func (e *env) producer() *kgo.Client {
+	e.t.Helper()
+	return e.kafka.Client(e.t, kafkax.ProducerOptions(e.kafka.Brokers(), "campaign")...)
 }
